@@ -1,6 +1,6 @@
 name: Build Windows x86
 
-# Pull requests build and verify only. Successful main pushes may synchronize release binaries.
+# Pull requests build and verify only. Successful main pushes synchronize generated release files.
 on:
   push:
     branches: [main]
@@ -9,6 +9,7 @@ on:
       - "build.bat"
       - "BABAClock.rc"
       - "resource.h"
+      - "assets/BABAClock-11-11.svg"
       - "assets/BABAClock-11-11.png"
       - "make_icon.py"
       - "tools/verify_pe.py"
@@ -20,6 +21,7 @@ on:
       - "build.bat"
       - "BABAClock.rc"
       - "resource.h"
+      - "assets/BABAClock-11-11.svg"
       - "assets/BABAClock-11-11.png"
       - "make_icon.py"
       - "tools/verify_pe.py"
@@ -48,7 +50,7 @@ jobs:
       - name: Install icon and PE verification tools
         run: python -m pip install --disable-pip-version-check pillow pefile
 
-      - name: Regenerate application icon
+      - name: Regenerate application assets
         run: python make_icon.py
 
       - name: Build BABA Clock
@@ -69,7 +71,7 @@ jobs:
           Copy-Item BABAClock.ico assets/BABAClock-11-11.ico -Force
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add BABAClock.exe BABAClock.ico assets/BABAClock-11-11.ico
+          git add BABAClock.exe BABAClock.ico assets/BABAClock-11-11.png assets/BABAClock-11-11.ico
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             git commit -m "Rebuild BABA Clock release [skip ci]"
@@ -87,7 +89,9 @@ jobs:
           path: |
             BABAClock.exe
             BABAClock.ico
+            assets/BABAClock-11-11.png
             assets/BABAClock-11-11.ico
+            assets/BABAClock-11-11.svg
             README.md
             LICENSE
             NOTICE
