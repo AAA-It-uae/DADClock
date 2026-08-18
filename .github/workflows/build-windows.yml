@@ -1,0 +1,79 @@
+name: Build Windows x86
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "clock.cpp"
+      - "build.bat"
+      - "BABAClock.rc"
+      - "resource.h"
+      - "assets/BABAClock-11-11.png"
+      - "make_icon.py"
+      - "tools/verify_pe.py"
+      - ".github/workflows/build-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Windows XP-11 x86 build
+    runs-on: windows-2022
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install icon and PE verification tools
+        run: python -m pip install --disable-pip-version-check pillow pefile
+
+      - name: Regenerate application icon
+        run: python make_icon.py
+
+      - name: Build BABA Clock
+        shell: cmd
+        run: call build.bat
+
+      - name: Verify portable PE
+        run: python tools/verify_pe.py BABAClock.exe
+
+      - name: SHA-256
+        shell: powershell
+        run: Get-FileHash BABAClock.exe -Algorithm SHA256 | Format-List
+
+      - name: Synchronize generated release files
+        shell: powershell
+        run: |
+          Copy-Item BABAClock.ico assets/BABAClock-11-11.ico -Force
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add BABAClock.exe BABAClock.ico assets/BABAClock-11-11.ico
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Rebuild BABA Clock release [skip ci]"
+            git push origin HEAD:main
+          } else {
+            Write-Host "Generated release files are already synchronized."
+          }
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BABAClock-Windows-x86
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            BABAClock.exe
+            BABAClock.ico
+            assets/BABAClock-11-11.ico
+            README.md
+            LICENSE
+            NOTICE
