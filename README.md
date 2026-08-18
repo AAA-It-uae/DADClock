@@ -1,16 +1,16 @@
 <div align="center">
 
-<img src="assets/BABAClock-11-11.png" width="220" alt="BABA Clock 11:11 icon">
+<img src="assets/BABAClock-11-11.svg" width="220" alt="BABA Clock 11:11 icon">
 
 # BABA Clock
 
-**A tiny, native, always-on-top digital clock for Windows XP through Windows 11.**
+**A tiny native always-on-top digital clock for Windows XP through Windows 11.**
 
 [![Build Windows x86](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml/badge.svg)](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 ![Windows](https://img.shields.io/badge/Windows-XP%20%E2%86%92%2011-0078D6)
 ![Architecture](https://img.shields.io/badge/architecture-x86-lightgrey)
-![C++](https://img.shields.io/badge/C%2B%2B-Win32%20%2B%20GDI-00599C)
+![Native](https://img.shields.io/badge/C%2B%2B-Win32%20%2B%20GDI-00599C)
 ![Portable](https://img.shields.io/badge/runtime-single%20EXE-success)
 
 *Made with love for my beloved father ♥*
@@ -19,105 +19,117 @@
 
 ---
 
-## What is BABA Clock?
+## Overview
 
-**BABA Clock** is a minimal desktop clock overlay built for one job: keep the time visible without getting in the way.
+**BABA Clock** is a small desktop clock overlay designed to stay visible above normal Windows applications without bringing a framework, installer, runtime package, font bundle, or configuration file with it.
 
-It is a native **32-bit C++ / Win32 / GDI** application. There is no .NET, Qt, Electron, browser engine, external font, configuration file, or application runtime to install. The checked-in release is a single portable `BABAClock.exe`.
+The application is written in **C++ using the Win32 API and GDI** and is built as a native **32-bit x86 Windows executable**.
 
-> Repository name: `DADClock`  
-> Product name: **BABA Clock**
+The runtime deliverable is simply:
 
-## Download and run
+```text
+BABAClock.exe
+```
 
-The current portable build is included in the repository:
+The current executable is built and validated by the repository's Windows GitHub Actions workflow.
+
+## Download
+
+The latest checked-in portable build is available directly from the repository:
 
 **[BABAClock.exe](BABAClock.exe)**
 
-Copy the EXE anywhere and run it. No installer is required.
+Copy it anywhere and run it. No installation is required.
 
-Windows may show a security warning for an unsigned executable. The complete source and build script are included so the binary can also be built locally.
+> Windows may show a security warning because the executable is not code-signed. The complete source, build script, resource files, and CI validation are included in this repository.
 
 ## Features
 
-The following features are implemented in the current source:
+The following functionality is implemented in the current source:
 
-- **Always on top** — the clock stays above normal application windows.
-- **Borderless black clock surface** with bright green digital digits.
-- **Native GDI rendering** — digits are drawn directly; no external font is required.
-- **Two clock styles**
-  - `7-Segment`
-  - `Digital Classic`
-- **12-hour and 24-hour formats**
-  - 24-hour is the default.
-  - Switching from the right-click menu updates immediately.
-  - 12-hour mode displays a proportional digital `AM` / `PM` indicator.
-  - The active format is check-marked in the menu.
-- **Optional seconds display**.
-- **Optional blinking colon** when seconds are hidden.
-- **Mouse dragging** — left-drag anywhere on the clock to move it.
-- **Mouse resizing** from the window edges and corners.
-- **Fixed aspect ratio** while resizing, so the digits do not stretch or deform.
-- **Persistent size and position** across launches.
-- **Run at Windows Startup** option for the current user.
-- **Settings and About windows** with a clickable link back to this repository.
-- **First-run dedication message**, shown only once.
-- **Low-overhead 1-second update timer** with redraws only when the displayed state changes.
-- **Single-file runtime** — no companion application files are required.
+- **Always-on-top** clock overlay
+- Borderless black clock surface
+- Bright green digital display
+- Native **GDI** rendering with no external clock font
+- Two clock styles:
+  - **7-Segment**
+  - **Digital Classic**
+- **24-hour** and **12-hour** formats
+- Digital **AM / PM** indicator in 12-hour mode
+- Immediate time-format switching from the right-click menu
+- Optional **seconds** display
+- Optional **blinking colon** when seconds are hidden
+- Drag the clock anywhere with the left mouse button
+- Resize from edges or corners
+- Fixed aspect ratio during resizing so digits do not deform
+- Persistent window position and size
+- Persistent display settings
+- Optional **Run at Windows Startup**
+- Settings window
+- About window
+- Clickable source repository link
+- First-run dedication message shown only once
+- Embedded application icon
+- One-second update timer with redraw only when displayed state changes
+- Single-file runtime with no companion application files
 
 ## Controls
 
 | Action | Result |
 |---|---|
-| Left-drag the clock | Move it |
-| Drag an edge or corner | Resize with aspect ratio preserved |
+| Left-drag | Move the clock |
+| Drag an edge or corner | Resize while preserving aspect ratio |
 | Right-click | Open the clock menu |
-| `Settings` | Open display/startup settings |
+| `Settings` | Open display and startup settings |
 | `Time Format → 24-Hour` | Switch immediately to 24-hour time |
 | `Time Format → 12-Hour` | Switch immediately to 12-hour time with AM/PM |
-| `About` | Show project, author, compatibility and license information |
+| `About` | Show project and technical information |
 | `Exit` | Close BABA Clock |
 
 ## Settings
 
 ### Show Seconds
-Shows or hides seconds beside hours and minutes.
+
+Shows or hides seconds beside the hour and minute digits.
 
 ### Blink Separator / Colon
-When seconds are **hidden**, the hour/minute colon can blink once per second.
 
-When seconds are visible, the separators remain visible so the full `HH:MM:SS` display stays stable.
+When seconds are hidden, the hour/minute separator can blink once per second.
 
 ### Run at Windows Startup
+
 Adds or removes BABA Clock from the current user's Windows startup registry entry.
 
-If the EXE is moved after startup has been enabled, disable and re-enable this option so Windows stores the new path.
+If the EXE is moved after enabling startup, disable and re-enable the option so Windows stores the new executable path.
 
 ### Clock Font
+
 Choose between:
 
-- **7-Segment** — rectangular digital segments.
-- **Digital Classic** — a more traditional shaped digital-segment style.
+- **7-Segment**
+- **Digital Classic**
 
-Both styles are rendered directly with GDI.
+Both are rendered directly with GDI.
 
-## Time formats
+## Time format
 
-### 24-hour
+The default format is **24-hour**.
+
+Examples:
 
 ```text
 23:57
 23:57:42
 ```
 
-### 12-hour
+In **12-hour** mode the application renders AM/PM beside the clock:
 
 ```text
 11:57 PM
 11:57:42 PM
 ```
 
-The selected format is saved automatically and restored on the next launch.
+Only one format is active at a time. The active option is check-marked in the right-click menu and the selection is restored on the next launch.
 
 ## First run
 
@@ -125,38 +137,38 @@ On the first launch only, BABA Clock displays:
 
 > **Made with love for my beloved father ♥**
 
-A registry flag records that the message has already been shown.
+The first-run state is then stored in the current user's registry so the message is not automatically shown again.
 
 ## Saved state
 
-BABA Clock stores its application state under the current Windows user:
+Application state is stored under:
 
 ```text
 HKEY_CURRENT_USER\Software\BABA Clock
 ```
 
-The implementation persists:
+The source persists:
 
-- window X/Y position
-- window width/height
-- show-seconds setting
-- blink-colon setting
+- X / Y position
+- width / height
+- seconds visibility
+- colon blinking
 - startup preference
 - 12/24-hour format
-- selected clock style
+- clock style
 - first-run state
 
-The startup command itself is stored under:
+Windows startup registration uses:
 
 ```text
 HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
 ```
 
-No separate `.ini`, `.json`, database, or configuration file is required.
+No `.ini`, JSON, local database, or external settings file is required.
 
-## Compatibility
+## Windows compatibility
 
-BABA Clock is intentionally built as an **x86 / 32-bit** Windows application and targets the **Windows 5.01 subsystem**.
+The project intentionally targets **x86 / 32-bit Windows** and the **Windows 5.01 subsystem**.
 
 | Windows version | Project target |
 |---|---|
@@ -168,16 +180,16 @@ BABA Clock is intentionally built as an **x86 / 32-bit** Windows application and
 | Windows 10 | Yes |
 | Windows 11 | Yes |
 
-On 64-bit Windows, the x86 executable runs through the normal Windows 32-bit compatibility layer.
-
-The code defines:
+The source defines:
 
 ```cpp
 _WIN32_WINNT 0x0501
 WINVER       0x0501
 ```
 
-and intentionally uses Win32 APIs available to the XP-era target.
+and avoids newer Win32 APIs in the application code.
+
+The CI pipeline verifies the PE subsystem and dependency contract. Formal behavioral certification on every historical Windows release still requires running the binary on those operating systems or representative VMs.
 
 ## Technology
 
@@ -187,56 +199,81 @@ and intentionally uses Win32 APIs available to the XP-era target.
 | Windowing | Win32 API |
 | Rendering | GDI |
 | Architecture | x86 / 32-bit |
-| Runtime UI framework | None |
+| Target subsystem | Windows GUI 5.01 |
+| UI framework | None |
 | C/C++ runtime dependency | None by design |
-| External application assets at runtime | None |
-| State | Windows Registry |
-| Build | Microsoft C++ toolchain + `build.bat` |
+| Runtime configuration files | None |
+| State storage | Windows Registry |
+| Build | Microsoft C++ toolchain |
 | License | Apache License 2.0 |
 
-The build links only against standard Windows system libraries used by the application:
+The executable imports only the Windows system DLLs required by the implementation:
 
 ```text
-kernel32.lib
-user32.lib
-gdi32.lib
-advapi32.lib
-shell32.lib
+advapi32.dll
+gdi32.dll
+kernel32.dll
+shell32.dll
+user32.dll
 ```
 
-## Build
+## Build locally
 
-### Requirements
-
-Install Visual Studio 2019 or 2022 / Build Tools with the **x86 C++ toolchain**.
-
-Then run:
+Install Visual Studio 2019 or 2022 / Build Tools with the x86 C++ toolchain and run:
 
 ```bat
 build.bat
 ```
 
-The script:
+The build script:
 
 1. locates an installed Visual Studio C++ toolchain,
-2. initializes the 32-bit compiler environment,
+2. initializes the x86 compiler environment,
 3. compiles `clock.cpp`,
-4. compiles the Windows resource file,
-5. links the executable for `WINDOWS,5.01`,
-6. links with `/NODEFAULTLIB`,
+4. compiles `BABAClock.rc`,
+5. links for `WINDOWS,5.01`,
+6. uses `/NODEFAULTLIB`,
 7. uses the custom `EntryPoint`,
 8. removes temporary object/resource files,
-9. leaves `BABAClock.exe`.
+9. leaves the portable `BABAClock.exe`.
 
-The build deliberately avoids a C/C++ runtime dependency and uses only the Windows system libraries required by the program.
+The application icon is already checked in, so Pillow is **not** needed just to compile the application.
+
+## Rebuild the artwork
+
+The visual identity is kept reproducible instead of depending on an opaque binary design source:
+
+- `assets/BABAClock-11-11.svg` — vector reference artwork
+- `make_icon.py` — deterministic raster asset generator
+- `assets/BABAClock-11-11.png` — generated preview
+- `BABAClock.ico` — generated multi-size Windows icon
+- `assets/BABAClock-11-11.ico` — generated release copy
+
+To regenerate the raster assets manually:
+
+```bash
+python -m pip install pillow
+python make_icon.py
+```
+
+Pillow is a **developer/CI-only** dependency. It is never required to run BABA Clock.
 
 ## Continuous build verification
 
-GitHub Actions builds the project on **Windows Server 2022** with the Microsoft x86 C++ toolchain. The workflow regenerates the ICO from the canonical 11:11 artwork, runs `build.bat`, validates the resulting PE, computes its SHA-256 hash, uploads a portable build artifact, and synchronizes the generated `BABAClock.ico` and `BABAClock.exe` back to `main` after a successful build.
+The repository contains a Windows GitHub Actions workflow that runs on **Windows Server 2022** and uses the Microsoft x86 C++ toolchain.
 
-The verification checks that the executable is:
+The pipeline:
 
-- PE32 / x86 (`0x014C`)
+1. regenerates the 11:11 application assets,
+2. builds `BABAClock.exe`,
+3. validates the resulting PE,
+4. calculates SHA-256,
+5. uploads a portable build artifact,
+6. on successful pushes to `main`, synchronizes generated PNG/ICO/EXE files back to the repository.
+
+`tools/verify_pe.py` checks that the executable is:
+
+- **PE32 / x86** (`0x014C`)
 - Windows GUI subsystem
 - subsystem version **5.01**
 - free of MSVC/UCRT runtime DLL dependencies
@@ -244,62 +281,35 @@ The verification checks that the executable is:
 - carrying an embedded icon resource
 - below the project's 1 MB sanity limit
 
-The CI runner verifies the build contract. Actual behavior on every historical Windows release should still be tested on the target OS when release-level certification is required.
+The validated runner build is currently approximately **71 KB**, while still containing the embedded multi-size application icon.
 
 ## Project structure
 
 ```text
 DADClock/
 ├─ .github/workflows/
-│  └─ build-windows.yml      # Windows/MSVC build + validation
+│  └─ build-windows.yml
 ├─ assets/
-│  ├─ BABAClock-11-11.png    # Canonical 11:11 artwork
-│  └─ BABAClock-11-11.ico    # Generated multi-size Windows icon
+│  ├─ BABAClock-11-11.svg
+│  ├─ BABAClock-11-11.png
+│  └─ BABAClock-11-11.ico
 ├─ tools/
-│  └─ verify_pe.py           # PE/runtime/embedded-icon validation
-├─ BABAClock.exe             # Current portable build
-├─ BABAClock.ico             # Multi-size 11:11 icon embedded in the EXE
-├─ BABAClock.rc              # Windows resource definition
-├─ build.bat                 # x86 / XP-targeted build script
-├─ clock.cpp                 # Application source
-├─ make_icon.py              # Regenerates ICO from canonical artwork
-├─ resource.h                # Resource identifiers
-├─ LICENSE                   # Apache License 2.0
-├─ NOTICE                    # Project attribution
+│  └─ verify_pe.py
+├─ BABAClock.exe
+├─ BABAClock.ico
+├─ BABAClock.rc
+├─ build.bat
+├─ clock.cpp
+├─ make_icon.py
+├─ resource.h
+├─ LICENSE
+├─ NOTICE
 └─ README.md
 ```
 
-### Artwork
+## About
 
-The canonical application artwork is `assets/BABAClock-11-11.png`. The generated `BABAClock.ico` contains multiple Windows icon sizes and is embedded directly in the executable through `BABAClock.rc`, so the repository artwork, Windows icon and EXE use the same **11:11 BABA Clock** identity.
-
-To regenerate the ICO for development, install Pillow and run:
-
-```bash
-python -m pip install pillow
-python make_icon.py
-```
-
-Pillow is a developer-only icon-generation dependency. It is not required to build from the checked-in ICO and is never required to run `BABAClock.exe`.
-
-## Implementation notes
-
-A few details are intentional:
-
-- The main clock uses `WS_EX_TOPMOST`.
-- The window has no visible non-client frame.
-- `WM_NCHITTEST` provides resize zones around the edges.
-- `WM_SIZING` enforces the clock's current layout ratio.
-- Time is read using `GetLocalTime`.
-- A 1-second timer updates the display.
-- GDI primitives draw digits, separators, and AM/PM.
-- Settings and position are persisted in `HKCU`.
-- Startup registration uses the current executable path.
-- The project URL in Settings/About opens with the user's default browser.
-
-## About dialog
-
-The application identifies itself with:
+The application identifies the project as:
 
 ```text
 BABA Clock
@@ -314,16 +324,11 @@ License: Apache License 2.0
 Source: https://github.com/AAA-It-uae/DADClock
 ```
 
-## Open source
+## License
 
-BABA Clock is released under the **Apache License 2.0**.
+BABA Clock is open source under the **Apache License 2.0**.
 
-See:
-
-- [LICENSE](LICENSE)
-- [NOTICE](NOTICE)
-
-Redistributions and derivative works must preserve the applicable license and attribution notices as required by the license.
+See [LICENSE](LICENSE) for the license terms and [NOTICE](NOTICE) for project attribution.
 
 ## Credits
 
