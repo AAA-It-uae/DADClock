@@ -1,5 +1,6 @@
 name: Build Windows x86
 
+# Pull requests build and verify only. Successful main pushes may synchronize release binaries.
 on:
   push:
     branches: [main]
