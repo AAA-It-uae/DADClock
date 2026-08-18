@@ -1,0 +1,6 @@
+*.obj
+*.res
+.vs/
+Debug/
+Release/
+x64/
