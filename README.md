@@ -31,11 +31,15 @@ It is built as a native **32-bit Win32 application** with **C++ and GDI**, with 
 - Mouse resizing with a fixed aspect ratio
 - Proportional scaling without deforming the digits
 - Optional seconds display
-- Optional blinking separator / colon
+- Blinking separator / colon when seconds are hidden; separators stay fixed with numeric seconds
 - Optional **Run at Windows Startup**
+- 24-hour and 12-hour time formats with AM/PM rendering
+- Optional GDI-drawn **Digital Classic** clock style alongside the standard 7-segment style
 - Saves window position, size, and settings in the current user's registry
-- Right-click menu with **Settings**, **About**, and **Exit**
+- Right-click menu with **Settings**, **Time Format**, **About**, and **Exit**
+- Clickable GitHub source link in Settings and About
 - First-run dedication message
+- Embedded dark/green digital-clock application icon
 - Extremely low CPU and memory usage
 - Single portable executable with no required external files
 
@@ -56,10 +60,10 @@ The application targets **x86 / 32-bit Windows** for maximum backward compatibil
 
 - **Language:** C++
 - **UI / Windowing:** Win32 API
-- **Rendering:** GDI
+- **Rendering:** GDI, including the selectable Digital Classic segment style
 - **Architecture:** x86 / 32-bit
 - **Target subsystem:** Windows XP compatible
-- **Dependencies:** None at runtime
+- **Dependencies:** Windows system DLLs only; no bundled runtime dependencies
 - **Packaging:** Single portable EXE
 
 No external frameworks are required.
@@ -73,6 +77,7 @@ The main window is intentionally minimal:
 - no title bar
 - no unnecessary controls
 - always visible above normal application windows
+- 12-hour mode keeps the AM/PM indicator aligned and proportional with the digits
 
 The window can be moved and resized directly with the mouse while preserving the clock's aspect ratio.
 
@@ -81,10 +86,21 @@ The window can be moved and resized directly with the mouse while preserving the
 BABA Clock provides only the settings needed for daily use:
 
 - **Show Seconds** — show or hide seconds beside the hour and minute digits
-- **Blink Separator / Colon** — enable or disable separator blinking
+- **Blink Separator / Colon** — enable or disable separator blinking while seconds are hidden; numeric seconds always use fixed separators
 - **Run at Windows Startup** — start BABA Clock automatically when the current user signs in
+- **Clock Font** — choose standard 7-segment or GDI-drawn Digital Classic styling
+
+### Time Format
+
+The default is **24-Hour**. The right-click **Time Format** submenu provides
+mutually exclusive **24-Hour** and **12-Hour** choices with a check mark beside
+the active format. The selected format is saved in the current user's registry.
+In 12-hour mode, the clock displays a proportional digital **AM** or **PM**
+indicator beside the time.
 
 Settings, window size, and window position are persisted in the current user's Windows Registry.
+The GitHub source link at the bottom of Settings and About opens the repository in
+the user's default browser.
 
 ## First Run
 
@@ -107,6 +123,8 @@ Made with love ♥
 Compatibility: Windows XP, Vista, 7, 8, 8.1, 10, 11
 Technology: C++ / Win32 API / GDI
 Architecture: 32-bit x86
+License: Apache License 2.0
+Source: https://github.com/AAA-It-uae/DADClock
 ```
 
 ## Build
@@ -125,7 +143,20 @@ The final release artifact should be:
 BABAClock.exe
 ```
 
-The executable must remain self-contained and require no installer, runtime package, external DLL, font, configuration file, or asset beside the EXE itself.
+`build.bat` locates the Visual Studio x86 tools when possible, compiles the
+native source and embedded icon resource, targets Windows XP subsystem 5.01,
+and links without the C/C++ runtime. The executable must remain self-contained
+and require no installer, runtime package, external DLL, font, configuration
+file, or asset beside the EXE itself. `make_icon.py` is only a developer-time
+standard-library generator for the checked-in ICO resource; it is not needed
+to run or build the application.
+
+## Application Icon
+
+The executable embeds a lightweight dark/black and bright-green digital-clock
+icon with 16, 32, 48, and 256-pixel variants. The same resource is used by the
+main window, Settings window, task switcher, executable shell icon, and About
+or first-run message boxes.
 
 ## Design Principles
 
