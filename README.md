@@ -150,7 +150,7 @@ and require no installer, runtime package, external DLL, font, configuration
 file, or asset beside the EXE itself. `make_icon.py` is only a developer-time
 standard-library converter for the checked-in ICO resource; it is not needed
 to run or build the application. To regenerate the embedded icon from the
-supplied artwork, run `python make_icon.py path/to/source.png BABAClock.ico`.
+supplied artwork, run `python make_icon.py path\\to\\source.png BABAClock.ico`.
 
 ## Application Icon
 

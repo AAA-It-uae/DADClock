@@ -338,6 +338,13 @@ static void DrawScaledPolygon(HDC dc, const int *coordinates, int count,
     Polygon(dc, points, count);
 }
 
+static void DrawScaledEllipse(HDC dc, int left, int top, int right, int bottom,
+                              int offsetX, int offsetY, int scale)
+{
+    Ellipse(dc, offsetX + Scaled(left, scale), offsetY + Scaled(top, scale),
+            offsetX + Scaled(right, scale), offsetY + Scaled(bottom, scale));
+}
+
 static void DrawClassicSegment(HDC dc, int x, int y, int segment,
                                int offsetX, int offsetY, int scale)
 {
@@ -432,8 +439,13 @@ static void DrawLetter(HDC dc, int x, int y, char letter,
 
 static void DrawColon(HDC dc, int x, int offsetX, int offsetY, int scale, HBRUSH brush)
 {
-    DrawScaledRect(dc, x, 17, x + 6, 23, offsetX, offsetY, scale, brush);
-    DrawScaledRect(dc, x, 35, x + 6, 41, offsetX, offsetY, scale, brush);
+    if (g_fontStyle == kFontClassic) {
+        DrawScaledEllipse(dc, x, 17, x + 6, 23, offsetX, offsetY, scale);
+        DrawScaledEllipse(dc, x, 35, x + 6, 41, offsetX, offsetY, scale);
+    } else {
+        DrawScaledRect(dc, x, 17, x + 6, 23, offsetX, offsetY, scale, brush);
+        DrawScaledRect(dc, x, 35, x + 6, 41, offsetX, offsetY, scale, brush);
+    }
 }
 
 static void PaintClock(HWND window, HDC dc)
@@ -441,6 +453,7 @@ static void PaintClock(HWND window, HDC dc)
     RECT client;
     HBRUSH green;
     HBRUSH black;
+    HBRUSH oldBrush;
     HPEN greenPen;
     HPEN oldPen;
     int clientWidth;
@@ -473,6 +486,7 @@ static void PaintClock(HWND window, HDC dc)
 
     green = CreateSolidBrush(RGB(0, 255, 0));
     greenPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
+    oldBrush = (HBRUSH)SelectObject(dc, green);
     oldPen = (HPEN)SelectObject(dc, greenPen);
     DrawDigit(dc, 8, 7, g_digits[0] - '0', offsetX, offsetY, scale, green);
     DrawDigit(dc, 39, 7, g_digits[1] - '0', offsetX, offsetY, scale, green);
@@ -494,6 +508,7 @@ static void PaintClock(HWND window, HDC dc)
         DrawLetter(dc, meridiemX + 31, 7, g_meridiem[1], offsetX, offsetY, scale, green);
     }
     SelectObject(dc, oldPen);
+    SelectObject(dc, oldBrush);
     DeleteObject(greenPen);
     DeleteObject(green);
 }
@@ -929,6 +944,12 @@ static LRESULT CALLBACK ClockWindowProc(HWND window, UINT message,
                                         WPARAM wParam, LPARAM lParam)
 {
     switch (message) {
+    case WM_NCCALCSIZE:
+        return 0;
+
+    case WM_NCPAINT:
+        return 0;
+
     case WM_CREATE:
         UpdateDigits(window);
         SetTimer(window, kTimerId, 1000, NULL);
@@ -1124,7 +1145,8 @@ static int RunClock(HINSTANCE instance)
         return 1;
 
     window = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
-                             kClockClassName, L"BABA Clock", WS_POPUP,
+                             kClockClassName, L"BABA Clock",
+                             WS_POPUP | WS_THICKFRAME,
                              x, y, width, height, NULL, NULL, instance, NULL);
     if (!window)
         return 2;

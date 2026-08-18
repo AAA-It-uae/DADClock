@@ -4,7 +4,7 @@
 """Convert the supplied BABA Clock artwork to a compact XP-compatible ICO.
 
 Usage:
-    python make_icon.py path/to/source.png [path/to/BABAClock.ico]
+    python make_icon.py path\\to\\source.png [path\\to\\BABAClock.ico]
 
 The application does not load the PNG at runtime. Only the generated ICO is
 embedded by the Windows resource compiler.
