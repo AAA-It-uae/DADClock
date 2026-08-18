@@ -412,6 +412,20 @@ static void DrawDigit(HDC dc, int x, int y, int digit,
     }
 }
 
+static void DrawClassicVerticalBar(HDC dc, int x, int top, int bottom,
+                                    int offsetX, int offsetY, int scale)
+{
+    int points[12];
+
+    points[0] = x + 3; points[1] = top;
+    points[2] = x + 6; points[3] = top + 3;
+    points[4] = x + 6; points[5] = bottom - 3;
+    points[6] = x + 3; points[7] = bottom;
+    points[8] = x;     points[9] = bottom - 3;
+    points[10] = x;    points[11] = top + 3;
+    DrawScaledPolygon(dc, points, 6, offsetX, offsetY, scale);
+}
+
 static void DrawLetter(HDC dc, int x, int y, char letter,
                        int offsetX, int offsetY, int scale, HBRUSH brush)
 {
@@ -431,9 +445,21 @@ static void DrawLetter(HDC dc, int x, int y, char letter,
     }
 
     if (letter == 'M') {
-        DrawScaledRect(dc, x, y + 4, x + 6, y + 40, offsetX, offsetY, scale, brush);
-        DrawScaledRect(dc, x + 20, y + 4, x + 26, y + 40, offsetX, offsetY, scale, brush);
-        DrawScaledRect(dc, x + 10, y + 4, x + 16, y + 20, offsetX, offsetY, scale, brush);
+        if (g_fontStyle == kFontClassic) {
+            DrawClassicVerticalBar(dc, x, y + 4, y + 40,
+                                   offsetX, offsetY, scale);
+            DrawClassicVerticalBar(dc, x + 20, y + 4, y + 40,
+                                   offsetX, offsetY, scale);
+            DrawClassicVerticalBar(dc, x + 10, y + 4, y + 20,
+                                   offsetX, offsetY, scale);
+        } else {
+            DrawScaledRect(dc, x, y + 4, x + 6, y + 40,
+                           offsetX, offsetY, scale, brush);
+            DrawScaledRect(dc, x + 20, y + 4, x + 26, y + 40,
+                           offsetX, offsetY, scale, brush);
+            DrawScaledRect(dc, x + 10, y + 4, x + 16, y + 20,
+                           offsetX, offsetY, scale, brush);
+        }
     }
 }
 
