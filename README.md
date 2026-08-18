@@ -148,16 +148,15 @@ native source and embedded icon resource, targets Windows XP subsystem 5.01,
 and links without the C/C++ runtime. The executable must remain self-contained
 and require no installer, runtime package, external DLL, font, configuration
 file, or asset beside the EXE itself. `make_icon.py` is only a developer-time
-standard-library converter for the checked-in ICO resource; it is not needed
-to run or build the application. To regenerate the embedded icon from the
-supplied artwork, run `python make_icon.py path\\to\\source.png BABAClock.ico`.
+standard-library generator for the checked-in ICO resource; it is not needed
+to run or build the application.
 
 ## Application Icon
 
-The executable embeds the supplied dark/black and bright-green BABA Clock
-artwork as a lightweight icon with 16, 32, 48, and 256-pixel variants. The
-same resource is used by the main window, Settings window, task switcher,
-executable shell icon, and About or first-run message boxes.
+The executable embeds a lightweight dark/black and bright-green digital-clock
+icon with 16, 32, 48, and 256-pixel variants. The same resource is used by the
+main window, Settings window, task switcher, executable shell icon, and About
+or first-run message boxes.
 
 ## Design Principles
 
