@@ -12,6 +12,18 @@ on:
       - "make_icon.py"
       - "tools/verify_pe.py"
       - ".github/workflows/build-windows.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "clock.cpp"
+      - "build.bat"
+      - "BABAClock.rc"
+      - "resource.h"
+      - "assets/BABAClock-11-11.png"
+      - "make_icon.py"
+      - "tools/verify_pe.py"
+      - "README.md"
+      - ".github/workflows/build-windows.yml"
   workflow_dispatch:
 
 permissions:
@@ -50,6 +62,7 @@ jobs:
         run: Get-FileHash BABAClock.exe -Algorithm SHA256 | Format-List
 
       - name: Synchronize generated release files
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: powershell
         run: |
           Copy-Item BABAClock.ico assets/BABAClock-11-11.ico -Force
