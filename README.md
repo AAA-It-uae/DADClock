@@ -1,11 +1,12 @@
 <div align="center">
 
-<img src="assets/BABAClock-11-11.png" width="160" alt="BABA Clock 11:11 icon">
+<img src="assets/BABAClock-11-11.png" width="220" alt="BABA Clock 11:11 icon">
 
 # BABA Clock
 
 **A tiny, native, always-on-top digital clock for Windows XP through Windows 11.**
 
+[![Build Windows x86](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml/badge.svg)](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 ![Windows](https://img.shields.io/badge/Windows-XP%20%E2%86%92%2011-0078D6)
 ![Architecture](https://img.shields.io/badge/architecture-x86-lightgrey)
@@ -80,23 +81,19 @@ The following features are implemented in the current source:
 ## Settings
 
 ### Show Seconds
-
 Shows or hides seconds beside hours and minutes.
 
 ### Blink Separator / Colon
-
 When seconds are **hidden**, the hour/minute colon can blink once per second.
 
 When seconds are visible, the separators remain visible so the full `HH:MM:SS` display stays stable.
 
 ### Run at Windows Startup
-
 Adds or removes BABA Clock from the current user's Windows startup registry entry.
 
 If the EXE is moved after startup has been enabled, disable and re-enable this option so Windows stores the new path.
 
 ### Clock Font
-
 Choose between:
 
 - **7-Segment** — rectangular digital segments.
@@ -233,18 +230,39 @@ The script:
 
 The build deliberately avoids a C/C++ runtime dependency and uses only the Windows system libraries required by the program.
 
+## Continuous build verification
+
+GitHub Actions builds the project on **Windows Server 2022** with the Microsoft x86 C++ toolchain. The workflow regenerates the ICO from the canonical 11:11 artwork, runs `build.bat`, validates the resulting PE, computes its SHA-256 hash, uploads a portable build artifact, and synchronizes the generated `BABAClock.ico` and `BABAClock.exe` back to `main` after a successful build.
+
+The verification checks that the executable is:
+
+- PE32 / x86 (`0x014C`)
+- Windows GUI subsystem
+- subsystem version **5.01**
+- free of MSVC/UCRT runtime DLL dependencies
+- limited to the expected Windows system imports
+- carrying an embedded icon resource
+- below the project's 1 MB sanity limit
+
+The CI runner verifies the build contract. Actual behavior on every historical Windows release should still be tested on the target OS when release-level certification is required.
+
 ## Project structure
 
 ```text
 DADClock/
+├─ .github/workflows/
+│  └─ build-windows.yml      # Windows/MSVC build + validation
 ├─ assets/
-│  └─ BABAClock-11-11.png   # 11:11 project artwork
+│  ├─ BABAClock-11-11.png    # Canonical 11:11 artwork
+│  └─ BABAClock-11-11.ico    # Generated multi-size Windows icon
+├─ tools/
+│  └─ verify_pe.py           # PE/runtime/embedded-icon validation
 ├─ BABAClock.exe             # Current portable build
-├─ BABAClock.ico             # Compact icon embedded by the current build
+├─ BABAClock.ico             # Multi-size 11:11 icon embedded in the EXE
 ├─ BABAClock.rc              # Windows resource definition
 ├─ build.bat                 # x86 / XP-targeted build script
 ├─ clock.cpp                 # Application source
-├─ make_icon.py              # Compact embedded-icon generator
+├─ make_icon.py              # Regenerates ICO from canonical artwork
 ├─ resource.h                # Resource identifiers
 ├─ LICENSE                   # Apache License 2.0
 ├─ NOTICE                    # Project attribution
@@ -253,9 +271,16 @@ DADClock/
 
 ### Artwork
 
-The `assets/` directory contains the new **11:11 BABA Clock** artwork used for the repository identity and README.
+The canonical application artwork is `assets/BABAClock-11-11.png`. The generated `BABAClock.ico` contains multiple Windows icon sizes and is embedded directly in the executable through `BABAClock.rc`, so the repository artwork, Windows icon and EXE use the same **11:11 BABA Clock** identity.
 
-The current executable still uses the deliberately compact `BABAClock.ico` resource. Keeping the high-detail artwork separate avoids silently changing the checked-in executable without rebuilding it and preserves the project's very small runtime footprint.
+To regenerate the ICO for development, install Pillow and run:
+
+```bash
+python -m pip install pillow
+python make_icon.py
+```
+
+Pillow is a developer-only icon-generation dependency. It is not required to build from the checked-in ICO and is never required to run `BABAClock.exe`.
 
 ## Implementation notes
 
