@@ -89,6 +89,13 @@ jobs:
           path: |
             DADClock.exe
             DADClock.ico
+            DADClock.rc
+            clock.cpp
+            build.bat
+            resource.h
+            make_icon.py
+            tools/verify_pe.py
+            .github/workflows/build-windows.yml
             assets/DADClock-11-11.png
             assets/DADClock-11-11.ico
             assets/DADClock-11-11.svg
