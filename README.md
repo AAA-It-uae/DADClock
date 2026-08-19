@@ -52,22 +52,34 @@ Copy the EXE anywhere and run it. No installation is required.
 - **Always-on-top** clock overlay
 - Borderless black clock surface
 - Optional **transparent background** so only the clock digits remain visible
-- Bright green digital display
 - Native **GDI** rendering
+- Selectable clock colors:
+  - Classic Green
+  - Lime
+  - Cyan
+  - Yellow
+  - Orange
+  - Red
+  - White
+  - Blue
+  - Magenta
 - Two built-in clock styles that require no external font files:
   - **7-Segment**
   - **Digital Classic**
 - Optional use of **font families installed on the current Windows system**
+- **Live font and color preview** directly on the clock while Settings is open
+- Canceling Settings restores the previous font and color preview
 - **24-hour** and **12-hour** formats
 - Optional **AM / PM** indicator in 12-hour mode
 - 12-hour mode can be used **with or without AM / PM**
 - Immediate time-format switching from the right-click menu
 - Optional **seconds** display
 - Optional **blinking colon** when seconds are hidden
+- Colon blinking works with both built-in digital styles and installed Windows fonts
 - Balanced separator/colon spacing between digit groups
 - Drag the clock anywhere with the left mouse button
 - Resize from edges or corners while preserving aspect ratio
-- Persistent window position, size, and display settings
+- Persistent window position, size, color, and display settings
 - Automatic recovery into a visible monitor work area after display-layout changes
 - Optional **Run at Windows Startup**
 - Settings and About windows centered on the monitor containing the clock
@@ -84,7 +96,7 @@ Copy the EXE anywhere and run it. No installation is required.
 | Left-drag | Move the clock |
 | Drag an edge or corner | Resize while preserving aspect ratio |
 | Right-click | Open the clock menu |
-| `Settings` | Open display, font, transparency, and startup settings |
+| `Settings` | Open display, font, color, transparency, and startup settings |
 | `Time Format → 24-Hour` | Switch immediately to 24-hour time |
 | `Time Format → 12-Hour` | Switch immediately to 12-hour time |
 | `About` | Show project and technical information |
@@ -99,6 +111,8 @@ Shows or hides seconds beside the hour and minute digits.
 ### Blink Separator / Colon
 
 When seconds are hidden, the hour/minute separator can blink once per second.
+
+The blink behavior is applied consistently to the built-in digital renderers and to Windows fonts selected from the font list.
 
 ### Run at Windows Startup
 
@@ -119,7 +133,7 @@ Examples:
 
 ### Transparent Background
 
-Uses the classic Win32 layered-window color key to make the black clock surface transparent while keeping the green digits visible.
+Uses the classic Win32 layered-window color key to make the black clock surface transparent while keeping the clock digits visible.
 
 When transparent mode is enabled, drag from a visible digit to move the clock. Disable transparency temporarily if you need the easiest access to the full resize area.
 
@@ -133,6 +147,29 @@ The font selector always contains the two built-in styles first:
 It then enumerates font families installed on the current Windows PC. Selecting one renders the clock through GDI using that local Windows font.
 
 No font file is shipped with DAD Clock. The two built-in digital styles remain available on every supported system.
+
+### Clock Color
+
+The color selector provides a fixed high-contrast palette that works with both the built-in digital styles and Windows fonts:
+
+- Classic Green
+- Lime
+- Cyan
+- Yellow
+- Orange
+- Red
+- White
+- Blue
+- Magenta
+
+The selected color is persisted in the Windows Registry and restored on the next launch.
+
+### Live Font and Color Preview
+
+Changing either **Clock Font** or **Clock Color** immediately redraws the real clock, so the preview is shown at the clock's actual size and position rather than in a simulated sample box.
+
+- Press **OK** to save the selected font and color.
+- Press **Cancel**, close the Settings window, or press **Esc** to restore the font and color that were active before Settings was opened.
 
 ## Time formats
 
@@ -193,6 +230,7 @@ The application persists:
 - transparent-background preference
 - clock rendering style
 - selected Windows font family name
+- selected clock color
 - first-run state
 
 Windows startup registration uses:
@@ -234,6 +272,8 @@ WINVER       0x0501
 
 and stays on classic Win32/GDI APIs rather than introducing a modern framework or runtime requirement.
 
+The font/color preview and color selector use existing Win32 controls, GDI drawing, and registry APIs; no framework or runtime dependency is added.
+
 The CI pipeline verifies the PE subsystem and dependency contract. Formal behavioral certification on every historical Windows release still requires running the binary on those operating systems or representative VMs.
 
 ## Technology
@@ -245,6 +285,7 @@ The CI pipeline verifies the PE subsystem and dependency contract. Formal behavi
 | Rendering | GDI |
 | Transparency | Win32 layered-window color key |
 | System font discovery | GDI font-family enumeration |
+| Font/color preview | Live redraw of the clock window |
 | Architecture | x86 / 32-bit |
 | Target subsystem | Windows GUI 5.01 |
 | UI framework | None |
