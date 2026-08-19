@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Mohammad Taghi Alavi
 
-"""Generate BABA Clock PNG and multi-size ICO from a reproducible 11:11 design."""
+"""Generate DAD Clock PNG and multi-size ICO from a reproducible 11:11 design."""
 
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent
-PNG_TARGET = ROOT / "assets" / "BABAClock-11-11.png"
-ICO_TARGET = ROOT / "BABAClock.ico"
+PNG_TARGET = ROOT / "assets" / "DADClock-11-11.png"
+ICO_TARGET = ROOT / "DADClock.ico"
 CANVAS = 512
 GREEN = (132, 255, 53, 255)
 GREEN_SOFT = (103, 225, 49, 255)
@@ -62,12 +62,12 @@ def build_image() -> Image.Image:
     draw.ellipse((248, 214, 264, 230), fill=GREEN)
     draw.ellipse((248, 282, 264, 298), fill=GREEN)
 
-    baba_font = font(34, bold=True)
+    dad_font = font(34, bold=True)
     clock_font = font(15, bold=False)
-    baba = "B A B A"
+    dad = "D A D"
     clock = "C L O C K"
-    bbox = draw.textbbox((0, 0), baba, font=baba_font)
-    draw.text(((CANVAS - (bbox[2] - bbox[0])) / 2, 365), baba, font=baba_font, fill=GREEN)
+    bbox = draw.textbbox((0, 0), dad, font=dad_font)
+    draw.text(((CANVAS - (bbox[2] - bbox[0])) / 2, 365), dad, font=dad_font, fill=GREEN)
     bbox = draw.textbbox((0, 0), clock, font=clock_font)
     draw.text(((CANVAS - (bbox[2] - bbox[0])) / 2, 408), clock, font=clock_font, fill=GREEN_SOFT)
 
