@@ -3,4 +3,4 @@
 
 #include "resource.h"
 
-IDI_BABA_CLOCK ICON "BABAClock.ico"
+IDI_DAD_CLOCK ICON "DADClock.ico"

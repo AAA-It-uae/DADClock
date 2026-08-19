@@ -7,10 +7,10 @@ on:
     paths:
       - "clock.cpp"
       - "build.bat"
-      - "BABAClock.rc"
+      - "DADClock.rc"
       - "resource.h"
-      - "assets/BABAClock-11-11.svg"
-      - "assets/BABAClock-11-11.png"
+      - "assets/DADClock-11-11.svg"
+      - "assets/DADClock-11-11.png"
       - "make_icon.py"
       - "tools/verify_pe.py"
       - ".github/workflows/build-windows.yml"
@@ -19,10 +19,10 @@ on:
     paths:
       - "clock.cpp"
       - "build.bat"
-      - "BABAClock.rc"
+      - "DADClock.rc"
       - "resource.h"
-      - "assets/BABAClock-11-11.svg"
-      - "assets/BABAClock-11-11.png"
+      - "assets/DADClock-11-11.svg"
+      - "assets/DADClock-11-11.png"
       - "make_icon.py"
       - "tools/verify_pe.py"
       - "README.md"
@@ -53,28 +53,28 @@ jobs:
       - name: Regenerate application assets
         run: python make_icon.py
 
-      - name: Build BABA Clock
+      - name: Build DAD Clock
         shell: cmd
         run: call build.bat
 
       - name: Verify portable PE
-        run: python tools/verify_pe.py BABAClock.exe
+        run: python tools/verify_pe.py DADClock.exe
 
       - name: SHA-256
         shell: powershell
-        run: Get-FileHash BABAClock.exe -Algorithm SHA256 | Format-List
+        run: Get-FileHash DADClock.exe -Algorithm SHA256 | Format-List
 
       - name: Synchronize generated release files
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: powershell
         run: |
-          Copy-Item BABAClock.ico assets/BABAClock-11-11.ico -Force
+          Copy-Item DADClock.ico assets/DADClock-11-11.ico -Force
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add BABAClock.exe BABAClock.ico assets/BABAClock-11-11.png assets/BABAClock-11-11.ico
+          git add DADClock.exe DADClock.ico assets/DADClock-11-11.png assets/DADClock-11-11.ico
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
-            git commit -m "Rebuild BABA Clock release [skip ci]"
+            git commit -m "Rebuild DAD Clock release [skip ci]"
             git push origin HEAD:main
           } else {
             Write-Host "Generated release files are already synchronized."
@@ -83,15 +83,15 @@ jobs:
       - name: Upload portable build
         uses: actions/upload-artifact@v4
         with:
-          name: BABAClock-Windows-x86
+          name: DADClock-Windows-x86
           if-no-files-found: error
           retention-days: 30
           path: |
-            BABAClock.exe
-            BABAClock.ico
-            assets/BABAClock-11-11.png
-            assets/BABAClock-11-11.ico
-            assets/BABAClock-11-11.svg
+            DADClock.exe
+            DADClock.ico
+            assets/DADClock-11-11.png
+            assets/DADClock-11-11.ico
+            assets/DADClock-11-11.svg
             README.md
             LICENSE
             NOTICE

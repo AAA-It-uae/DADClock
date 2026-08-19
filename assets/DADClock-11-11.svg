@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="BABA Clock 11:11">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="DAD Clock 11:11">
   <defs>
     <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#303332"/>
@@ -30,6 +30,6 @@
     <rect x="369" y="182" width="15" height="70" rx="7"/>
     <rect x="369" y="260" width="15" height="70" rx="7"/>
   </g>
-  <text x="256" y="390" text-anchor="middle" fill="#8cff35" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="700" letter-spacing="10">BABA</text>
+  <text x="256" y="390" text-anchor="middle" fill="#8cff35" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="700" letter-spacing="10">DAD</text>
   <text x="256" y="417" text-anchor="middle" fill="#76ed35" font-family="Arial,Helvetica,sans-serif" font-size="15" letter-spacing="7">CLOCK</text>
 </svg>
