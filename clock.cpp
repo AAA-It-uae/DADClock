@@ -23,12 +23,14 @@ extern "C" void *__cdecl memcpy(void *destination, const void *source, unsigned 
 extern "C" HINSTANCE WINAPI ShellExecuteW(HWND, LPCWSTR, LPCWSTR,
                                            LPCWSTR, LPCWSTR, INT);
 
-static const WCHAR kClockClassName[] = L"BABAClockWindow";
-static const WCHAR kSettingsClassName[] = L"BABAClockSettingsWindow";
-static const WCHAR kAboutClassName[] = L"BABAClockAboutWindow";
-static const char kRegistryPath[] = "Software\\BABA Clock";
+static const WCHAR kClockClassName[] = L"DADClockWindow";
+static const WCHAR kSettingsClassName[] = L"DADClockSettingsWindow";
+static const WCHAR kAboutClassName[] = L"DADClockAboutWindow";
+static const char kRegistryPath[] = "Software\\DAD Clock";
+static const char kLegacyRegistryPath[] = "Software\\BABA Clock";
 static const WCHAR kStartupKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-static const WCHAR kStartupValue[] = L"BABA Clock";
+static const WCHAR kStartupValue[] = L"DAD Clock";
+static const WCHAR kLegacyStartupValue[] = L"BABA Clock";
 static const WCHAR kRepositoryUrl[] = L"https://github.com/AAA-It-uae/DADClock";
 static const WCHAR kSourceText[] = L"Source: https://github.com/AAA-It-uae/DADClock";
 static const WCHAR kBuiltIn7SegmentText[] = L"Built-in: 7-Segment";
@@ -68,7 +70,7 @@ static const int kAboutHeight = 350;
 
 static const WCHAR kFirstRunText[] = L"Made with love for my beloved father \u2665";
 static const WCHAR kBrandingText[] =
-    L"BABA Clock\r\n"
+    L"DAD Clock\r\n"
     L"Built by Mohammad Taghi Alavi\r\n"
     L"Idea by Abbas Alavi\r\n"
     L"Made with love \u2665\r\n\r\n"
@@ -77,7 +79,7 @@ static const WCHAR kBrandingText[] =
     L"Architecture: 32-bit x86\r\n"
     L"License: Apache License 2.0";
 static const WCHAR kSettingsCreditText[] =
-    L"BABA Clock - Built by Mohammad Taghi Alavi";
+    L"DAD Clock - Built by Mohammad Taghi Alavi";
 static const WCHAR kFontHintText[] =
     L"Built-in styles are always available. Other entries are fonts installed on this Windows PC.";
 static const WCHAR kTransparentHintText[] =
@@ -188,24 +190,34 @@ static BOOL BuildStartupCommand(WCHAR *command, DWORD capacity)
     return TRUE;
 }
 
+static BOOL StartupValueMatches(HKEY key, const WCHAR *valueName,
+                                const WCHAR *expected)
+{
+    WCHAR stored[MAX_PATH + 4];
+    DWORD type = 0;
+    DWORD size = sizeof(stored);
+
+    if (RegQueryValueExW(key, valueName, NULL, &type, (BYTE *)stored, &size) != ERROR_SUCCESS ||
+        type != REG_SZ)
+        return FALSE;
+    stored[(MAX_PATH + 4) - 1] = L'\0';
+    return WideEquals(stored, expected);
+}
+
 static BOOL IsStartupEnabled()
 {
     HKEY key;
-    WCHAR stored[MAX_PATH + 4];
     WCHAR expected[MAX_PATH + 4];
-    DWORD type = 0;
-    DWORD size = sizeof(stored);
-    BOOL enabled = FALSE;
+    BOOL enabled;
 
     if (!BuildStartupCommand(expected, MAX_PATH + 4))
         return FALSE;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
         return FALSE;
-    if (RegQueryValueExW(key, kStartupValue, NULL, &type, (BYTE *)stored, &size) == ERROR_SUCCESS &&
-        type == REG_SZ) {
-        stored[(MAX_PATH + 4) - 1] = L'\0';
-        enabled = WideEquals(stored, expected);
-    }
+
+    enabled = StartupValueMatches(key, kStartupValue, expected);
+    if (!enabled)
+        enabled = StartupValueMatches(key, kLegacyStartupValue, expected);
     RegCloseKey(key);
     return enabled;
 }
@@ -214,6 +226,7 @@ static BOOL ConfigureStartup(BOOL enabled)
 {
     HKEY key;
     LONG result;
+    LONG legacyResult;
 
     if (!enabled) {
         result = RegOpenKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, KEY_SET_VALUE, &key);
@@ -222,8 +235,10 @@ static BOOL ConfigureStartup(BOOL enabled)
         if (result != ERROR_SUCCESS)
             return FALSE;
         result = RegDeleteValueW(key, kStartupValue);
+        legacyResult = RegDeleteValueW(key, kLegacyStartupValue);
         RegCloseKey(key);
-        return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND;
+        return (result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND) &&
+               (legacyResult == ERROR_SUCCESS || legacyResult == ERROR_FILE_NOT_FOUND);
     }
 
     result = RegCreateKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, NULL,
@@ -244,6 +259,8 @@ static BOOL ConfigureStartup(BOOL enabled)
             ++length;
         result = RegSetValueExW(key, kStartupValue, 0, REG_SZ,
                                 (const BYTE *)command, (length + 1) * sizeof(WCHAR));
+        if (result == ERROR_SUCCESS)
+            RegDeleteValueW(key, kLegacyStartupValue);
     }
     RegCloseKey(key);
     return result == ERROR_SUCCESS;
@@ -338,6 +355,7 @@ static void LoadState(int *x, int *y, int *width, int *height)
     HKEY key;
     DWORD value;
     BOOL haveWidth = FALSE;
+    LONG openResult;
 
     *height = kBaseHeight;
     g_showSeconds = FALSE;
@@ -354,7 +372,10 @@ static void LoadState(int *x, int *y, int *width, int *height)
     g_fontName[4] = L'l';
     g_fontName[5] = L'\0';
 
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, kRegistryPath, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) {
+    openResult = RegOpenKeyExA(HKEY_CURRENT_USER, kRegistryPath, 0, KEY_QUERY_VALUE, &key);
+    if (openResult != ERROR_SUCCESS)
+        openResult = RegOpenKeyExA(HKEY_CURRENT_USER, kLegacyRegistryPath, 0, KEY_QUERY_VALUE, &key);
+    if (openResult != ERROR_SUCCESS) {
         *width = LayoutWidth();
         return;
     }
@@ -429,8 +450,17 @@ static BOOL IsFirstRun()
     HKEY key;
     DWORD value;
     BOOL firstRun = TRUE;
+    BOOL found = FALSE;
 
     if (RegOpenKeyExA(HKEY_CURRENT_USER, kRegistryPath, 0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
+        if (QueryDword(key, "FirstRunShown", &value)) {
+            firstRun = value == 0;
+            found = TRUE;
+        }
+        RegCloseKey(key);
+    }
+    if (!found && RegOpenKeyExA(HKEY_CURRENT_USER, kLegacyRegistryPath, 0,
+                                KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
         if (QueryDword(key, "FirstRunShown", &value))
             firstRun = value == 0;
         RegCloseKey(key);
@@ -912,7 +942,7 @@ static void KeepAspectRatio(RECT *windowRect, WPARAM edge)
     }
     if (newWidth < minWidth) {
         newWidth = minWidth;
-        newHeight = (newWidth * kBaseHeight + baseWidth / 2) / baseWidth;
+        newHeight = (newWidth * kBaseHeight + kBaseHeight / 2) / kBaseHeight;
     }
     if (newHeight < minHeight) {
         newHeight = minHeight;
@@ -1148,7 +1178,7 @@ static void ApplySettings(HWND settingsWindow)
     if (!ConfigureStartup(requestedStartup))
         MessageBoxW(settingsWindow,
                     L"Windows startup registration could not be changed. The other settings were saved.",
-                    L"BABA Clock", MB_OK | MB_ICONWARNING);
+                    L"DAD Clock", MB_OK | MB_ICONWARNING);
     g_runAtStartup = IsStartupEnabled();
 
     ApplyTransparency(g_settingsOwner);
@@ -1289,7 +1319,7 @@ static void ShowSettings(HWND owner)
     g_settingsOwner = owner;
     EnableWindow(owner, FALSE);
     g_settingsWindow = CreateWindowExW(WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
-                                       kSettingsClassName, L"BABA Clock Settings",
+                                       kSettingsClassName, L"DAD Clock Settings",
                                        WS_POPUP | WS_CAPTION | WS_SYSMENU,
                                        x, y, kSettingsWidth, kSettingsHeight,
                                        owner, NULL, g_instance, NULL);
@@ -1379,7 +1409,7 @@ static void ShowAbout(HWND owner)
     g_aboutOwner = owner;
     EnableWindow(owner, FALSE);
     g_aboutWindow = CreateWindowExW(WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
-                                    kAboutClassName, L"About BABA Clock",
+                                    kAboutClassName, L"About DAD Clock",
                                     WS_POPUP | WS_CAPTION | WS_SYSMENU,
                                     x, y, kAboutWidth, kAboutHeight,
                                     owner, NULL, g_instance, NULL);
@@ -1578,7 +1608,7 @@ static int ShowIconMessage(HWND owner, const WCHAR *text, const WCHAR *caption)
     parameters.lpszText = text;
     parameters.lpszCaption = caption;
     parameters.dwStyle = MB_OK | MB_USERICON;
-    parameters.lpszIcon = MAKEINTRESOURCEW(IDI_BABA_CLOCK);
+    parameters.lpszIcon = MAKEINTRESOURCEW(IDI_DAD_CLOCK);
     parameters.dwContextHelpId = 0;
     parameters.lpfnMsgBoxCallback = NULL;
     parameters.dwLanguageId = 0;
@@ -1595,7 +1625,7 @@ static int RunClock(HINSTANCE instance)
     int height;
 
     g_instance = instance;
-    g_icon = LoadIconW(g_instance, MAKEINTRESOURCEW(IDI_BABA_CLOCK));
+    g_icon = LoadIconW(g_instance, MAKEINTRESOURCEW(IDI_DAD_CLOCK));
     x = (GetSystemMetrics(SM_CXSCREEN) - k24MinutesWidth) / 2;
     y = (GetSystemMetrics(SM_CYSCREEN) - kBaseHeight) / 2;
     LoadState(&x, &y, &width, &height);
@@ -1604,7 +1634,7 @@ static int RunClock(HINSTANCE instance)
         return 1;
 
     window = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
-                             kClockClassName, L"BABA Clock",
+                             kClockClassName, L"DAD Clock",
                              WS_POPUP | WS_THICKFRAME,
                              x, y, width, height, NULL, NULL, instance, NULL);
     if (!window)
@@ -1614,7 +1644,7 @@ static int RunClock(HINSTANCE instance)
                  SWP_SHOWWINDOW | SWP_NOACTIVATE);
     if (IsFirstRun()) {
         MarkFirstRunShown();
-        ShowIconMessage(window, kFirstRunText, L"BABA Clock");
+        ShowIconMessage(window, kFirstRunText, L"DAD Clock");
     }
 
     while (GetMessageW(&message, NULL, 0, 0) > 0) {
