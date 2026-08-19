@@ -31,6 +31,8 @@ static const WCHAR kStartupKey[] = L"Software\\Microsoft\\Windows\\CurrentVersio
 static const WCHAR kStartupValue[] = L"BABA Clock";
 static const WCHAR kRepositoryUrl[] = L"https://github.com/AAA-It-uae/DADClock";
 static const WCHAR kSourceText[] = L"Source: https://github.com/AAA-It-uae/DADClock";
+static const WCHAR kBuiltIn7SegmentText[] = L"Built-in: 7-Segment";
+static const WCHAR kBuiltInClassicText[] = L"Built-in: Digital Classic";
 
 static const UINT kTimerId = 1;
 static const UINT kSettingsId = 100;
@@ -44,21 +46,23 @@ static const UINT kBlinkColonControl = 202;
 static const UINT kStartupControl = 203;
 static const UINT kOkControl = 204;
 static const UINT kCancelControl = 205;
-static const UINT kFont7SegmentControl = 206;
-static const UINT kFontClassicControl = 207;
+static const UINT kFontComboControl = 206;
 static const UINT kSourceLinkControl = 208;
+static const UINT kShowMeridiemControl = 209;
+static const UINT kTransparentControl = 210;
 
 static const int kFormat24 = 0;
 static const int kFormat12 = 1;
 static const int kFont7Segment = 0;
 static const int kFontClassic = 1;
+static const int kFontSystem = 2;
 static const int kBaseHeight = 58;
 static const int k24MinutesWidth = 156;
 static const int k24SecondsWidth = 228;
 static const int k12MinutesWidth = 224;
 static const int k12SecondsWidth = 301;
-static const int kSettingsWidth = 480;
-static const int kSettingsHeight = 430;
+static const int kSettingsWidth = 500;
+static const int kSettingsHeight = 390;
 static const int kAboutWidth = 520;
 static const int kAboutHeight = 350;
 
@@ -72,6 +76,12 @@ static const WCHAR kBrandingText[] =
     L"Technology: C++ / Win32 API / GDI\r\n"
     L"Architecture: 32-bit x86\r\n"
     L"License: Apache License 2.0";
+static const WCHAR kSettingsCreditText[] =
+    L"BABA Clock - Built by Mohammad Taghi Alavi";
+static const WCHAR kFontHintText[] =
+    L"Built-in styles are always available. Other entries are fonts installed on this Windows PC.";
+static const WCHAR kTransparentHintText[] =
+    L"Transparent mode uses the classic Windows layered-window color key. Drag from a visible digit to move the clock.";
 
 static const unsigned char kSegments[10] = {
     0x3F, 0x06, 0x5B, 0x4F, 0x66,
@@ -88,15 +98,18 @@ static HWND g_aboutOwner;
 static BOOL g_showSeconds;
 static BOOL g_blinkColon;
 static BOOL g_runAtStartup;
+static BOOL g_showMeridiem;
+static BOOL g_transparentBackground;
 static int g_timeFormat;
 static int g_fontStyle;
 static BOOL g_colonVisible = TRUE;
 static char g_digits[9] = "00:00:00";
 static char g_meridiem[3] = "AM";
+static WCHAR g_fontName[LF_FACESIZE] = L"Arial";
 
 static int LayoutWidth()
 {
-    if (g_timeFormat == kFormat12)
+    if (g_timeFormat == kFormat12 && g_showMeridiem)
         return g_showSeconds ? k12SecondsWidth : k12MinutesWidth;
     return g_showSeconds ? k24SecondsWidth : k24MinutesWidth;
 }
@@ -104,6 +117,18 @@ static int LayoutWidth()
 static int Scaled(int value, int scale)
 {
     return (value * scale) / 1000;
+}
+
+static BOOL WideEquals(const WCHAR *left, const WCHAR *right)
+{
+    int i = 0;
+
+    while (left[i] || right[i]) {
+        if (left[i] != right[i])
+            return FALSE;
+        ++i;
+    }
+    return TRUE;
 }
 
 static BOOL QueryDword(HKEY key, const char *name, DWORD *value)
@@ -120,6 +145,194 @@ static void WriteDword(HKEY key, const char *name, DWORD value)
     RegSetValueExA(key, name, 0, REG_DWORD, (const BYTE *)&value, sizeof(value));
 }
 
+static BOOL QueryString(HKEY key, const WCHAR *name, WCHAR *value, DWORD capacity)
+{
+    DWORD type = 0;
+    DWORD size = capacity * sizeof(WCHAR);
+
+    if (!capacity)
+        return FALSE;
+    value[0] = L'\0';
+    if (RegQueryValueExW(key, name, NULL, &type, (BYTE *)value, &size) != ERROR_SUCCESS ||
+        type != REG_SZ || size < sizeof(WCHAR))
+        return FALSE;
+    value[capacity - 1] = L'\0';
+    return TRUE;
+}
+
+static void WriteString(HKEY key, const WCHAR *name, const WCHAR *value)
+{
+    DWORD length = 0;
+
+    while (value[length])
+        ++length;
+    RegSetValueExW(key, name, 0, REG_SZ, (const BYTE *)value,
+                   (length + 1) * sizeof(WCHAR));
+}
+
+static BOOL BuildStartupCommand(WCHAR *command, DWORD capacity)
+{
+    WCHAR path[MAX_PATH];
+    DWORD length;
+    DWORD i;
+
+    length = GetModuleFileNameW(NULL, path, MAX_PATH);
+    if (!length || length >= MAX_PATH - 1 || capacity < length + 3)
+        return FALSE;
+
+    command[0] = L'"';
+    for (i = 0; i < length; ++i)
+        command[i + 1] = path[i];
+    command[length + 1] = L'"';
+    command[length + 2] = L'\0';
+    return TRUE;
+}
+
+static BOOL IsStartupEnabled()
+{
+    HKEY key;
+    WCHAR stored[MAX_PATH + 4];
+    WCHAR expected[MAX_PATH + 4];
+    DWORD type = 0;
+    DWORD size = sizeof(stored);
+    BOOL enabled = FALSE;
+
+    if (!BuildStartupCommand(expected, MAX_PATH + 4))
+        return FALSE;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
+        return FALSE;
+    if (RegQueryValueExW(key, kStartupValue, NULL, &type, (BYTE *)stored, &size) == ERROR_SUCCESS &&
+        type == REG_SZ) {
+        stored[(MAX_PATH + 4) - 1] = L'\0';
+        enabled = WideEquals(stored, expected);
+    }
+    RegCloseKey(key);
+    return enabled;
+}
+
+static BOOL ConfigureStartup(BOOL enabled)
+{
+    HKEY key;
+    LONG result;
+
+    if (!enabled) {
+        result = RegOpenKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, KEY_SET_VALUE, &key);
+        if (result == ERROR_FILE_NOT_FOUND)
+            return TRUE;
+        if (result != ERROR_SUCCESS)
+            return FALSE;
+        result = RegDeleteValueW(key, kStartupValue);
+        RegCloseKey(key);
+        return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND;
+    }
+
+    result = RegCreateKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, NULL,
+                             REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL,
+                             &key, NULL);
+    if (result != ERROR_SUCCESS)
+        return FALSE;
+
+    {
+        WCHAR command[MAX_PATH + 4];
+        DWORD length = 0;
+
+        if (!BuildStartupCommand(command, MAX_PATH + 4)) {
+            RegCloseKey(key);
+            return FALSE;
+        }
+        while (command[length])
+            ++length;
+        result = RegSetValueExW(key, kStartupValue, 0, REG_SZ,
+                                (const BYTE *)command, (length + 1) * sizeof(WCHAR));
+    }
+    RegCloseKey(key);
+    return result == ERROR_SUCCESS;
+}
+
+static void ClampPositionToNearestMonitor(int *x, int *y, int width, int height)
+{
+    RECT rect;
+    MONITORINFO info;
+    HMONITOR monitor;
+    int workWidth;
+    int workHeight;
+
+    rect.left = *x;
+    rect.top = *y;
+    rect.right = *x + width;
+    rect.bottom = *y + height;
+    monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+    if (!monitor)
+        return;
+
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(monitor, &info))
+        return;
+
+    workWidth = info.rcWork.right - info.rcWork.left;
+    workHeight = info.rcWork.bottom - info.rcWork.top;
+
+    if (width >= workWidth)
+        *x = info.rcWork.left;
+    else {
+        if (*x < info.rcWork.left)
+            *x = info.rcWork.left;
+        if (*x + width > info.rcWork.right)
+            *x = info.rcWork.right - width;
+    }
+
+    if (height >= workHeight)
+        *y = info.rcWork.top;
+    else {
+        if (*y < info.rcWork.top)
+            *y = info.rcWork.top;
+        if (*y + height > info.rcWork.bottom)
+            *y = info.rcWork.bottom - height;
+    }
+}
+
+static void CenterOnOwnerMonitor(HWND owner, int width, int height, int *x, int *y)
+{
+    MONITORINFO info;
+    HMONITOR monitor;
+    int workWidth;
+    int workHeight;
+
+    monitor = MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST);
+    info.cbSize = sizeof(info);
+    if (monitor && GetMonitorInfoW(monitor, &info)) {
+        workWidth = info.rcWork.right - info.rcWork.left;
+        workHeight = info.rcWork.bottom - info.rcWork.top;
+        *x = info.rcWork.left + (workWidth - width) / 2;
+        *y = info.rcWork.top + (workHeight - height) / 2;
+        ClampPositionToNearestMonitor(x, y, width, height);
+        return;
+    }
+
+    *x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
+    *y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
+}
+
+static void MoveClockIntoVisibleWorkArea(HWND window)
+{
+    RECT rect;
+    int x;
+    int y;
+    int width;
+    int height;
+
+    if (!GetWindowRect(window, &rect))
+        return;
+    x = rect.left;
+    y = rect.top;
+    width = rect.right - rect.left;
+    height = rect.bottom - rect.top;
+    ClampPositionToNearestMonitor(&x, &y, width, height);
+    if (x != rect.left || y != rect.top)
+        SetWindowPos(window, NULL, x, y, 0, 0,
+                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 static void LoadState(int *x, int *y, int *width, int *height)
 {
     HKEY key;
@@ -129,9 +342,17 @@ static void LoadState(int *x, int *y, int *width, int *height)
     *height = kBaseHeight;
     g_showSeconds = FALSE;
     g_blinkColon = TRUE;
-    g_runAtStartup = FALSE;
+    g_runAtStartup = IsStartupEnabled();
+    g_showMeridiem = TRUE;
+    g_transparentBackground = FALSE;
     g_timeFormat = kFormat24;
     g_fontStyle = kFont7Segment;
+    g_fontName[0] = L'A';
+    g_fontName[1] = L'r';
+    g_fontName[2] = L'i';
+    g_fontName[3] = L'a';
+    g_fontName[4] = L'l';
+    g_fontName[5] = L'\0';
 
     if (RegOpenKeyExA(HKEY_CURRENT_USER, kRegistryPath, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) {
         *width = LayoutWidth();
@@ -152,12 +373,15 @@ static void LoadState(int *x, int *y, int *width, int *height)
         g_showSeconds = value != 0;
     if (QueryDword(key, "BlinkColon", &value))
         g_blinkColon = value != 0;
-    if (QueryDword(key, "RunAtStartup", &value))
-        g_runAtStartup = value != 0;
     if (QueryDword(key, "TimeFormat", &value) && value <= kFormat12)
         g_timeFormat = (int)value;
-    if (QueryDword(key, "FontStyle", &value) && value <= kFontClassic)
+    if (QueryDword(key, "FontStyle", &value) && value <= kFontSystem)
         g_fontStyle = (int)value;
+    if (QueryDword(key, "ShowMeridiem", &value))
+        g_showMeridiem = value != 0;
+    if (QueryDword(key, "TransparentBackground", &value))
+        g_transparentBackground = value != 0;
+    QueryString(key, L"FontName", g_fontName, LF_FACESIZE);
 
     RegCloseKey(key);
     if (!haveWidth)
@@ -193,7 +417,10 @@ static void SaveWindowState(HWND window)
     WriteDword(key, "BlinkColon", g_blinkColon ? 1 : 0);
     WriteDword(key, "RunAtStartup", g_runAtStartup ? 1 : 0);
     WriteDword(key, "TimeFormat", g_timeFormat == kFormat12 ? 1 : 0);
-    WriteDword(key, "FontStyle", g_fontStyle == kFontClassic ? 1 : 0);
+    WriteDword(key, "FontStyle", (DWORD)g_fontStyle);
+    WriteDword(key, "ShowMeridiem", g_showMeridiem ? 1 : 0);
+    WriteDword(key, "TransparentBackground", g_transparentBackground ? 1 : 0);
+    WriteString(key, L"FontName", g_fontName);
     RegCloseKey(key);
 }
 
@@ -224,38 +451,28 @@ static void MarkFirstRunShown()
     }
 }
 
-static void ConfigureStartup(BOOL enabled)
+static void ApplyTransparency(HWND window)
 {
-    HKEY key;
+    LONG exStyle = GetWindowLongW(window, GWL_EXSTYLE);
+    LONG desiredStyle = exStyle;
 
-    if (!enabled) {
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, KEY_SET_VALUE, &key) == ERROR_SUCCESS) {
-            RegDeleteValueW(key, kStartupValue);
-            RegCloseKey(key);
-        }
-        return;
+    if (g_transparentBackground)
+        desiredStyle |= WS_EX_LAYERED;
+    else
+        desiredStyle &= ~WS_EX_LAYERED;
+
+    if (desiredStyle != exStyle) {
+        SetWindowLongW(window, GWL_EXSTYLE, desiredStyle);
+        SetWindowPos(window, NULL, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOACTIVATE | SWP_FRAMECHANGED);
     }
 
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, kStartupKey, 0, NULL,
-                        REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL,
-                        &key, NULL) == ERROR_SUCCESS) {
-        WCHAR path[MAX_PATH];
-        WCHAR command[MAX_PATH + 4];
-        DWORD length;
-        DWORD i;
+    if (g_transparentBackground)
+        SetLayeredWindowAttributes(window, RGB(0, 0, 0), 255, LWA_COLORKEY);
 
-        length = GetModuleFileNameW(NULL, path, MAX_PATH);
-        if (length != 0 && length < MAX_PATH - 1) {
-            command[0] = L'"';
-            for (i = 0; i < length; ++i)
-                command[i + 1] = path[i];
-            command[length + 1] = L'"';
-            command[length + 2] = L'\0';
-            RegSetValueExW(key, kStartupValue, 0, REG_SZ,
-                           (const BYTE *)command, (length + 3) * sizeof(WCHAR));
-        }
-        RegCloseKey(key);
-    }
+    RedrawWindow(window, NULL, NULL,
+                 RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW);
 }
 
 static void UpdateDigits(HWND window)
@@ -318,11 +535,12 @@ static void DrawScaledRect(HDC dc, int left, int top, int right, int bottom,
                            int offsetX, int offsetY, int scale, HBRUSH brush)
 {
     RECT r;
+    (void)brush;
     r.left = offsetX + Scaled(left, scale);
     r.top = offsetY + Scaled(top, scale);
     r.right = offsetX + Scaled(right, scale);
     r.bottom = offsetY + Scaled(bottom, scale);
-    FillRect(dc, &r, brush);
+    FillRect(dc, &r, (HBRUSH)GetCurrentObject(dc, OBJ_BRUSH));
 }
 
 static void DrawScaledPolygon(HDC dc, const int *coordinates, int count,
@@ -375,13 +593,14 @@ static void DrawClassicSegment(HDC dc, int x, int y, int segment,
     DrawScaledPolygon(dc, points, 6, offsetX, offsetY, scale);
 }
 
-static void DrawSegment(HDC dc, int x, int y, int segment,
+static void DrawSegment(HWND window, HDC dc, int x, int y, int segment,
                         int offsetX, int offsetY, int scale, HBRUSH brush)
 {
     int left;
     int top;
     int right;
     int bottom;
+    (void)window;
 
     if (g_fontStyle == kFontClassic) {
         DrawClassicSegment(dc, x, y, segment, offsetX, offsetY, scale);
@@ -400,7 +619,7 @@ static void DrawSegment(HDC dc, int x, int y, int segment,
     DrawScaledRect(dc, left, top, right, bottom, offsetX, offsetY, scale, brush);
 }
 
-static void DrawDigit(HDC dc, int x, int y, int digit,
+static void DrawDigit(HWND window, HDC dc, int x, int y, int digit,
                       int offsetX, int offsetY, int scale, HBRUSH brush)
 {
     unsigned char mask = kSegments[digit];
@@ -408,7 +627,7 @@ static void DrawDigit(HDC dc, int x, int y, int digit,
 
     for (segment = 0; segment < 7; ++segment) {
         if (mask & (1 << segment))
-            DrawSegment(dc, x, y, segment, offsetX, offsetY, scale, brush);
+            DrawSegment(window, dc, x, y, segment, offsetX, offsetY, scale, brush);
     }
 }
 
@@ -426,7 +645,7 @@ static void DrawClassicVerticalBar(HDC dc, int x, int top, int bottom,
     DrawScaledPolygon(dc, points, 6, offsetX, offsetY, scale);
 }
 
-static void DrawLetter(HDC dc, int x, int y, char letter,
+static void DrawLetter(HWND window, HDC dc, int x, int y, char letter,
                        int offsetX, int offsetY, int scale, HBRUSH brush)
 {
     unsigned char mask;
@@ -441,7 +660,7 @@ static void DrawLetter(HDC dc, int x, int y, char letter,
 
     for (segment = 0; segment < 7; ++segment) {
         if (mask & (1 << segment))
-            DrawSegment(dc, x, y, segment, offsetX, offsetY, scale, brush);
+            DrawSegment(window, dc, x, y, segment, offsetX, offsetY, scale, brush);
     }
 
     if (letter == 'M') {
@@ -474,6 +693,102 @@ static void DrawColon(HDC dc, int x, int offsetX, int offsetY, int scale, HBRUSH
     }
 }
 
+static int BuildDisplayText(WCHAR *text, int capacity)
+{
+    int count = 0;
+    int i;
+    int digitCount = g_showSeconds ? 8 : 5;
+
+    for (i = 0; i < digitCount && count < capacity - 1; ++i)
+        text[count++] = (WCHAR)(unsigned char)g_digits[i];
+
+    if (g_timeFormat == kFormat12 && g_showMeridiem && count < capacity - 4) {
+        text[count++] = L' ';
+        text[count++] = (WCHAR)(unsigned char)g_meridiem[0];
+        text[count++] = (WCHAR)(unsigned char)g_meridiem[1];
+    }
+    text[count] = L'\0';
+    return count;
+}
+
+static BOOL PaintSystemFontClock(HWND window, HDC dc, const RECT *client)
+{
+    WCHAR text[16];
+    int textLength;
+    int clientWidth = client->right - client->left;
+    int clientHeight = client->bottom - client->top;
+    int availableWidth = clientWidth > 8 ? clientWidth - 8 : clientWidth;
+    int availableHeight = clientHeight > 4 ? clientHeight - 4 : clientHeight;
+    int fontHeight = availableHeight * 9 / 10;
+    int adjustedHeight;
+    int x;
+    int y;
+    int oldBkMode;
+    COLORREF oldColor;
+    HFONT font;
+    HFONT oldFont;
+    SIZE textSize;
+    BYTE quality = g_transparentBackground ? NONANTIALIASED_QUALITY : DEFAULT_QUALITY;
+    (void)window;
+
+    if (fontHeight < 8)
+        fontHeight = 8;
+    textLength = BuildDisplayText(text, 16);
+
+    font = CreateFontW(-fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                       DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                       quality, DEFAULT_PITCH | FF_DONTCARE, g_fontName);
+    if (!font)
+        return FALSE;
+
+    oldFont = (HFONT)SelectObject(dc, font);
+    if (!GetTextExtentPoint32W(dc, text, textLength, &textSize)) {
+        SelectObject(dc, oldFont);
+        DeleteObject(font);
+        return FALSE;
+    }
+
+    if ((textSize.cx > availableWidth || textSize.cy > availableHeight) &&
+        textSize.cx > 0 && textSize.cy > 0) {
+        adjustedHeight = fontHeight;
+        if (textSize.cx > availableWidth)
+            adjustedHeight = (fontHeight * availableWidth) / textSize.cx;
+        if (textSize.cy > availableHeight) {
+            int byHeight = (fontHeight * availableHeight) / textSize.cy;
+            if (byHeight < adjustedHeight)
+                adjustedHeight = byHeight;
+        }
+        if (adjustedHeight < 6)
+            adjustedHeight = 6;
+
+        SelectObject(dc, oldFont);
+        DeleteObject(font);
+        fontHeight = adjustedHeight;
+        font = CreateFontW(-fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                           DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                           quality, DEFAULT_PITCH | FF_DONTCARE, g_fontName);
+        if (!font)
+            return FALSE;
+        oldFont = (HFONT)SelectObject(dc, font);
+        if (!GetTextExtentPoint32W(dc, text, textLength, &textSize)) {
+            SelectObject(dc, oldFont);
+            DeleteObject(font);
+            return FALSE;
+        }
+    }
+
+    x = (clientWidth - textSize.cx) / 2;
+    y = (clientHeight - textSize.cy) / 2;
+    oldBkMode = SetBkMode(dc, TRANSPARENT);
+    oldColor = SetTextColor(dc, RGB(0, 255, 0));
+    TextOutW(dc, x, y, text, textLength);
+    SetTextColor(dc, oldColor);
+    SetBkMode(dc, oldBkMode);
+    SelectObject(dc, oldFont);
+    DeleteObject(font);
+    return TRUE;
+}
+
 static void PaintClock(HWND window, HDC dc)
 {
     RECT client;
@@ -497,6 +812,9 @@ static void PaintClock(HWND window, HDC dc)
     black = (HBRUSH)GetStockObject(BLACK_BRUSH);
     FillRect(dc, &client, black);
 
+    if (g_fontStyle == kFontSystem && PaintSystemFontClock(window, dc, &client))
+        return;
+
     clientWidth = client.right - client.left;
     clientHeight = client.bottom - client.top;
     scaleX = (clientWidth * 1000) / LayoutWidth();
@@ -512,27 +830,34 @@ static void PaintClock(HWND window, HDC dc)
 
     green = CreateSolidBrush(RGB(0, 255, 0));
     greenPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
+    if (!green || !greenPen) {
+        if (greenPen) DeleteObject(greenPen);
+        if (green) DeleteObject(green);
+        return;
+    }
     oldBrush = (HBRUSH)SelectObject(dc, green);
     oldPen = (HPEN)SelectObject(dc, greenPen);
-    DrawDigit(dc, 8, 7, g_digits[0] - '0', offsetX, offsetY, scale, green);
-    DrawDigit(dc, 39, 7, g_digits[1] - '0', offsetX, offsetY, scale, green);
+
+    DrawDigit(window, dc, 8, 7, g_digits[0] - '0', offsetX, offsetY, scale, green);
+    DrawDigit(window, dc, 39, 7, g_digits[1] - '0', offsetX, offsetY, scale, green);
     if (g_colonVisible)
-        DrawColon(dc, 70, offsetX, offsetY, scale, green);
-    DrawDigit(dc, 85, 7, g_digits[3] - '0', offsetX, offsetY, scale, green);
-    DrawDigit(dc, 116, 7, g_digits[4] - '0', offsetX, offsetY, scale, green);
+        DrawColon(dc, 72, offsetX, offsetY, scale, green);
+    DrawDigit(window, dc, 85, 7, g_digits[3] - '0', offsetX, offsetY, scale, green);
+    DrawDigit(window, dc, 116, 7, g_digits[4] - '0', offsetX, offsetY, scale, green);
 
     if (g_showSeconds) {
         if (g_colonVisible)
-            DrawColon(dc, 147, offsetX, offsetY, scale, green);
-        DrawDigit(dc, 162, 7, g_digits[6] - '0', offsetX, offsetY, scale, green);
-        DrawDigit(dc, 193, 7, g_digits[7] - '0', offsetX, offsetY, scale, green);
+            DrawColon(dc, 149, offsetX, offsetY, scale, green);
+        DrawDigit(window, dc, 162, 7, g_digits[6] - '0', offsetX, offsetY, scale, green);
+        DrawDigit(window, dc, 193, 7, g_digits[7] - '0', offsetX, offsetY, scale, green);
     }
 
-    if (g_timeFormat == kFormat12) {
+    if (g_timeFormat == kFormat12 && g_showMeridiem) {
         meridiemX = g_showSeconds ? 236 : 159;
-        DrawLetter(dc, meridiemX, 7, g_meridiem[0], offsetX, offsetY, scale, green);
-        DrawLetter(dc, meridiemX + 31, 7, g_meridiem[1], offsetX, offsetY, scale, green);
+        DrawLetter(window, dc, meridiemX, 7, g_meridiem[0], offsetX, offsetY, scale, green);
+        DrawLetter(window, dc, meridiemX + 31, 7, g_meridiem[1], offsetX, offsetY, scale, green);
     }
+
     SelectObject(dc, oldPen);
     SelectObject(dc, oldBrush);
     DeleteObject(greenPen);
@@ -560,6 +885,7 @@ static void ApplyLayoutSize(HWND window, int oldBaseWidth, int oldWidth, int old
     height = Scaled(kBaseHeight, scale);
     SetWindowPos(window, HWND_TOPMOST, windowRect.left, windowRect.top,
                  width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    MoveClockIntoVisibleWorkArea(window);
     InvalidateRect(window, NULL, FALSE);
 }
 
@@ -665,6 +991,68 @@ static LRESULT LinkColor(HWND window, WPARAM wParam, LPARAM lParam)
     return (LRESULT)GetSysColorBrush(COLOR_BTNFACE);
 }
 
+static int CALLBACK FontEnumProc(const LOGFONTW *logFont, const TEXTMETRICW *,
+                                 DWORD, LPARAM lParam)
+{
+    HWND combo = (HWND)lParam;
+    const WCHAR *face = logFont->lfFaceName;
+
+    if (!face[0] || face[0] == L'@')
+        return 1;
+    if (SendMessageW(combo, CB_FINDSTRINGEXACT, (WPARAM)-1, (LPARAM)face) == CB_ERR)
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)face);
+    return 1;
+}
+
+static void PopulateFontCombo(HWND window)
+{
+    HWND combo = GetDlgItem(window, kFontComboControl);
+    HDC dc;
+    LOGFONTW logFont;
+    int i;
+    LRESULT selection;
+
+    SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)kBuiltIn7SegmentText);
+    SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)kBuiltInClassicText);
+
+    logFont.lfHeight = 0;
+    logFont.lfWidth = 0;
+    logFont.lfEscapement = 0;
+    logFont.lfOrientation = 0;
+    logFont.lfWeight = 0;
+    logFont.lfItalic = 0;
+    logFont.lfUnderline = 0;
+    logFont.lfStrikeOut = 0;
+    logFont.lfCharSet = DEFAULT_CHARSET;
+    logFont.lfOutPrecision = 0;
+    logFont.lfClipPrecision = 0;
+    logFont.lfQuality = 0;
+    logFont.lfPitchAndFamily = 0;
+    for (i = 0; i < LF_FACESIZE; ++i)
+        logFont.lfFaceName[i] = L'\0';
+
+    dc = GetDC(window);
+    if (dc) {
+        EnumFontFamiliesExW(dc, &logFont, FontEnumProc, (LPARAM)combo, 0);
+        ReleaseDC(window, dc);
+    }
+
+    if (g_fontStyle == kFont7Segment)
+        selection = 0;
+    else if (g_fontStyle == kFontClassic)
+        selection = 1;
+    else {
+        selection = SendMessageW(combo, CB_FINDSTRINGEXACT, (WPARAM)-1,
+                                 (LPARAM)g_fontName);
+        if (selection == CB_ERR) {
+            SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)g_fontName);
+            selection = SendMessageW(combo, CB_FINDSTRINGEXACT, (WPARAM)-1,
+                                     (LPARAM)g_fontName);
+        }
+    }
+    SendMessageW(combo, CB_SETCURSEL, (WPARAM)selection, 0);
+}
+
 static void ShowClockMenu(HWND window, int x, int y)
 {
     HMENU menu;
@@ -710,27 +1098,60 @@ static void SelectTimeFormat(HWND window, int format)
     SaveWindowState(window);
 }
 
+static void ApplySelectedFont(HWND settingsWindow)
+{
+    HWND combo = GetDlgItem(settingsWindow, kFontComboControl);
+    LRESULT selection = SendMessageW(combo, CB_GETCURSEL, 0, 0);
+
+    if (selection == 0) {
+        g_fontStyle = kFont7Segment;
+        return;
+    }
+    if (selection == 1) {
+        g_fontStyle = kFontClassic;
+        return;
+    }
+    if (selection != CB_ERR) {
+        g_fontStyle = kFontSystem;
+        SendMessageW(combo, CB_GETLBTEXT, (WPARAM)selection, (LPARAM)g_fontName);
+        g_fontName[LF_FACESIZE - 1] = L'\0';
+        return;
+    }
+    g_fontStyle = kFont7Segment;
+}
+
 static void ApplySettings(HWND settingsWindow)
 {
     int oldBaseWidth = LayoutWidth();
     int oldWidth;
     int oldHeight;
     RECT oldRect;
+    BOOL requestedStartup;
 
     if (!GetWindowRect(g_settingsOwner, &oldRect))
         return;
     oldWidth = oldRect.right - oldRect.left;
     oldHeight = oldRect.bottom - oldRect.top;
+
     g_showSeconds = SendMessageW(GetDlgItem(settingsWindow, kShowSecondsControl),
                                  BM_GETCHECK, 0, 0) == BST_CHECKED;
     g_blinkColon = SendMessageW(GetDlgItem(settingsWindow, kBlinkColonControl),
                                 BM_GETCHECK, 0, 0) == BST_CHECKED;
-    g_runAtStartup = SendMessageW(GetDlgItem(settingsWindow, kStartupControl),
+    requestedStartup = SendMessageW(GetDlgItem(settingsWindow, kStartupControl),
+                                    BM_GETCHECK, 0, 0) == BST_CHECKED;
+    g_showMeridiem = SendMessageW(GetDlgItem(settingsWindow, kShowMeridiemControl),
                                   BM_GETCHECK, 0, 0) == BST_CHECKED;
-    g_fontStyle = SendMessageW(GetDlgItem(settingsWindow, kFontClassicControl),
-                               BM_GETCHECK, 0, 0) == BST_CHECKED ? kFontClassic : kFont7Segment;
+    g_transparentBackground = SendMessageW(GetDlgItem(settingsWindow, kTransparentControl),
+                                           BM_GETCHECK, 0, 0) == BST_CHECKED;
+    ApplySelectedFont(settingsWindow);
 
-    ConfigureStartup(g_runAtStartup);
+    if (!ConfigureStartup(requestedStartup))
+        MessageBoxW(settingsWindow,
+                    L"Windows startup registration could not be changed. The other settings were saved.",
+                    L"BABA Clock", MB_OK | MB_ICONWARNING);
+    g_runAtStartup = IsStartupEnabled();
+
+    ApplyTransparency(g_settingsOwner);
     ApplyLayoutSize(g_settingsOwner, oldBaseWidth, oldWidth, oldHeight);
     UpdateDigits(g_settingsOwner);
     SaveWindowState(g_settingsOwner);
@@ -743,49 +1164,62 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
     case WM_CREATE:
         CreateWindowExW(0, L"BUTTON", L"Show Seconds",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
-                        16, 14, 420, 24, window, (HMENU)kShowSecondsControl,
+                        16, 14, 450, 24, window, (HMENU)kShowSecondsControl,
                         g_instance, NULL);
-        CreateWindowExW(0, L"BUTTON", L"Blink Separator/Colon",
+        CreateWindowExW(0, L"BUTTON", L"Blink Separator / Colon",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
-                        16, 43, 420, 24, window, (HMENU)kBlinkColonControl,
+                        16, 42, 450, 24, window, (HMENU)kBlinkColonControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"BUTTON", L"Run at Windows Startup",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
-                        16, 72, 420, 24, window, (HMENU)kStartupControl,
+                        16, 70, 450, 24, window, (HMENU)kStartupControl,
+                        g_instance, NULL);
+        CreateWindowExW(0, L"BUTTON", L"Show AM / PM in 12-Hour Mode",
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
+                        16, 98, 450, 24, window, (HMENU)kShowMeridiemControl,
+                        g_instance, NULL);
+        CreateWindowExW(0, L"BUTTON", L"Transparent Background",
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
+                        16, 126, 450, 24, window, (HMENU)kTransparentControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"STATIC", L"Clock Font",
                         WS_CHILD | WS_VISIBLE,
-                        16, 105, 420, 20, window, NULL, g_instance, NULL);
-        CreateWindowExW(0, L"BUTTON", L"7-Segment",
-                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTORADIOBUTTON | WS_GROUP,
-                        16, 126, 180, 24, window, (HMENU)kFont7SegmentControl,
+                        16, 158, 450, 20, window, NULL, g_instance, NULL);
+        CreateWindowExW(WS_EX_CLIENTEDGE, L"COMBOBOX", L"",
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
+                        CBS_DROPDOWNLIST,
+                        16, 179, 452, 210, window, (HMENU)kFontComboControl,
                         g_instance, NULL);
-        CreateWindowExW(0, L"BUTTON", L"Digital Classic",
-                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTORADIOBUTTON,
-                        205, 126, 220, 24, window, (HMENU)kFontClassicControl,
-                        g_instance, NULL);
+        CreateWindowExW(0, L"STATIC", kFontHintText,
+                        WS_CHILD | WS_VISIBLE | SS_LEFT,
+                        16, 207, 452, 35, window, NULL, g_instance, NULL);
+        CreateWindowExW(0, L"STATIC", kTransparentHintText,
+                        WS_CHILD | WS_VISIBLE | SS_LEFT,
+                        16, 242, 452, 35, window, NULL, g_instance, NULL);
         CreateWindowExW(0, L"BUTTON", L"OK",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-                        170, 171, 64, 25, window, (HMENU)kOkControl,
+                        176, 282, 64, 25, window, (HMENU)kOkControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"BUTTON", L"Cancel",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                        242, 171, 64, 25, window, (HMENU)kCancelControl,
+                        248, 282, 64, 25, window, (HMENU)kCancelControl,
                         g_instance, NULL);
-        CreateWindowExW(0, L"STATIC", kBrandingText,
+        CreateWindowExW(0, L"STATIC", kSettingsCreditText,
                         WS_CHILD | WS_VISIBLE | SS_CENTER,
-                        10, 215, 460, 145, window, NULL, g_instance, NULL);
-        CreateSourceLink(window, 10, 365, 460, 22);
+                        10, 316, 480, 20, window, NULL, g_instance, NULL);
+        CreateSourceLink(window, 10, 340, 480, 22);
+
         SendMessageW(GetDlgItem(window, kShowSecondsControl), BM_SETCHECK,
                      g_showSeconds ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessageW(GetDlgItem(window, kBlinkColonControl), BM_SETCHECK,
                      g_blinkColon ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessageW(GetDlgItem(window, kStartupControl), BM_SETCHECK,
                      g_runAtStartup ? BST_CHECKED : BST_UNCHECKED, 0);
-        SendMessageW(GetDlgItem(window, kFont7SegmentControl), BM_SETCHECK,
-                     g_fontStyle == kFont7Segment ? BST_CHECKED : BST_UNCHECKED, 0);
-        SendMessageW(GetDlgItem(window, kFontClassicControl), BM_SETCHECK,
-                     g_fontStyle == kFontClassic ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessageW(GetDlgItem(window, kShowMeridiemControl), BM_SETCHECK,
+                     g_showMeridiem ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessageW(GetDlgItem(window, kTransparentControl), BM_SETCHECK,
+                     g_transparentBackground ? BST_CHECKED : BST_UNCHECKED, 0);
+        PopulateFontCombo(window);
         SetFocus(GetDlgItem(window, kOkControl));
         return 0;
 
@@ -843,7 +1277,6 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
 
 static void ShowSettings(HWND owner)
 {
-    RECT ownerRect;
     int x;
     int y;
 
@@ -851,11 +1284,8 @@ static void ShowSettings(HWND owner)
         SetForegroundWindow(g_settingsWindow);
         return;
     }
-    if (!GetWindowRect(owner, &ownerRect))
-        return;
 
-    x = ownerRect.left + ((ownerRect.right - ownerRect.left) - kSettingsWidth) / 2;
-    y = ownerRect.top + ((ownerRect.bottom - ownerRect.top) - kSettingsHeight) / 2;
+    CenterOnOwnerMonitor(owner, kSettingsWidth, kSettingsHeight, &x, &y);
     g_settingsOwner = owner;
     EnableWindow(owner, FALSE);
     g_settingsWindow = CreateWindowExW(WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
@@ -937,7 +1367,6 @@ static LRESULT CALLBACK AboutWindowProc(HWND window, UINT message,
 
 static void ShowAbout(HWND owner)
 {
-    RECT ownerRect;
     int x;
     int y;
 
@@ -945,11 +1374,8 @@ static void ShowAbout(HWND owner)
         SetForegroundWindow(g_aboutWindow);
         return;
     }
-    if (!GetWindowRect(owner, &ownerRect))
-        return;
 
-    x = ownerRect.left + ((ownerRect.right - ownerRect.left) - kAboutWidth) / 2;
-    y = ownerRect.top + ((ownerRect.bottom - ownerRect.top) - kAboutHeight) / 2;
+    CenterOnOwnerMonitor(owner, kAboutWidth, kAboutHeight, &x, &y);
     g_aboutOwner = owner;
     EnableWindow(owner, FALSE);
     g_aboutWindow = CreateWindowExW(WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
@@ -977,6 +1403,7 @@ static LRESULT CALLBACK ClockWindowProc(HWND window, UINT message,
         return 0;
 
     case WM_CREATE:
+        ApplyTransparency(window);
         UpdateDigits(window);
         SetTimer(window, kTimerId, 1000, NULL);
         return 0;
@@ -984,6 +1411,11 @@ static LRESULT CALLBACK ClockWindowProc(HWND window, UINT message,
     case WM_TIMER:
         if (wParam == kTimerId)
             UpdateDigits(window);
+        return 0;
+
+    case WM_DISPLAYCHANGE:
+        MoveClockIntoVisibleWorkArea(window);
+        SaveWindowState(window);
         return 0;
 
     case WM_PAINT:
@@ -1167,6 +1599,7 @@ static int RunClock(HINSTANCE instance)
     x = (GetSystemMetrics(SM_CXSCREEN) - k24MinutesWidth) / 2;
     y = (GetSystemMetrics(SM_CYSCREEN) - kBaseHeight) / 2;
     LoadState(&x, &y, &width, &height);
+    ClampPositionToNearestMonitor(&x, &y, width, height);
     if (!RegisterWindowClasses())
         return 1;
 
