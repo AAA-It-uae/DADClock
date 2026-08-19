@@ -942,7 +942,7 @@ static void KeepAspectRatio(RECT *windowRect, WPARAM edge)
     }
     if (newWidth < minWidth) {
         newWidth = minWidth;
-        newHeight = (newWidth * kBaseHeight + kBaseHeight / 2) / kBaseHeight;
+        newHeight = (newWidth * kBaseHeight + baseWidth / 2) / baseWidth;
     }
     if (newHeight < minHeight) {
         newHeight = minHeight;
