@@ -52,6 +52,7 @@ static const UINT kFontComboControl = 206;
 static const UINT kSourceLinkControl = 208;
 static const UINT kShowMeridiemControl = 209;
 static const UINT kTransparentControl = 210;
+static const UINT kColorComboControl = 211;
 
 static const int kFormat24 = 0;
 static const int kFormat12 = 1;
@@ -64,9 +65,28 @@ static const int k24SecondsWidth = 228;
 static const int k12MinutesWidth = 224;
 static const int k12SecondsWidth = 301;
 static const int kSettingsWidth = 500;
-static const int kSettingsHeight = 390;
+static const int kSettingsHeight = 475;
 static const int kAboutWidth = 520;
 static const int kAboutHeight = 350;
+
+struct ClockColorOption {
+    const WCHAR *name;
+    COLORREF color;
+};
+
+static const ClockColorOption kClockColorOptions[] = {
+    { L"Classic Green", RGB(0, 255, 0) },
+    { L"Lime",          RGB(128, 255, 0) },
+    { L"Cyan",          RGB(0, 255, 255) },
+    { L"Yellow",        RGB(255, 255, 0) },
+    { L"Orange",        RGB(255, 165, 0) },
+    { L"Red",           RGB(255, 64, 64) },
+    { L"White",         RGB(255, 255, 255) },
+    { L"Blue",          RGB(64, 160, 255) },
+    { L"Magenta",       RGB(255, 64, 255) }
+};
+static const int kClockColorCount =
+    sizeof(kClockColorOptions) / sizeof(kClockColorOptions[0]);
 
 static const WCHAR kFirstRunText[] = L"Made with love for my beloved father \u2665";
 static const WCHAR kBrandingText[] =
@@ -82,6 +102,8 @@ static const WCHAR kSettingsCreditText[] =
     L"DAD Clock - Built by Mohammad Taghi Alavi";
 static const WCHAR kFontHintText[] =
     L"Built-in styles are always available. Other entries are fonts installed on this Windows PC.";
+static const WCHAR kLivePreviewHintText[] =
+    L"Font and color changes preview live on the clock. Cancel restores the previous look.";
 static const WCHAR kTransparentHintText[] =
     L"Transparent mode uses the classic Windows layered-window color key. Drag from a visible digit to move the clock.";
 
@@ -104,10 +126,15 @@ static BOOL g_showMeridiem;
 static BOOL g_transparentBackground;
 static int g_timeFormat;
 static int g_fontStyle;
+static COLORREF g_clockColor = RGB(0, 255, 0);
 static BOOL g_colonVisible = TRUE;
 static char g_digits[9] = "00:00:00";
 static char g_meridiem[3] = "AM";
 static WCHAR g_fontName[LF_FACESIZE] = L"Arial";
+static BOOL g_settingsPreviewActive;
+static int g_previewFontStyle;
+static WCHAR g_previewFontName[LF_FACESIZE];
+static COLORREF g_previewClockColor;
 
 static int LayoutWidth()
 {
@@ -131,6 +158,30 @@ static BOOL WideEquals(const WCHAR *left, const WCHAR *right)
         ++i;
     }
     return TRUE;
+}
+
+static void CopyWideString(WCHAR *destination, const WCHAR *source, int capacity)
+{
+    int i = 0;
+
+    if (capacity <= 0)
+        return;
+    while (i < capacity - 1 && source[i]) {
+        destination[i] = source[i];
+        ++i;
+    }
+    destination[i] = L'\0';
+}
+
+static BOOL IsSupportedClockColor(COLORREF color)
+{
+    int i;
+
+    for (i = 0; i < kClockColorCount; ++i) {
+        if (kClockColorOptions[i].color == color)
+            return TRUE;
+    }
+    return FALSE;
 }
 
 static BOOL QueryDword(HKEY key, const char *name, DWORD *value)
@@ -365,6 +416,7 @@ static void LoadState(int *x, int *y, int *width, int *height)
     g_transparentBackground = FALSE;
     g_timeFormat = kFormat24;
     g_fontStyle = kFont7Segment;
+    g_clockColor = RGB(0, 255, 0);
     g_fontName[0] = L'A';
     g_fontName[1] = L'r';
     g_fontName[2] = L'i';
@@ -402,6 +454,8 @@ static void LoadState(int *x, int *y, int *width, int *height)
         g_showMeridiem = value != 0;
     if (QueryDword(key, "TransparentBackground", &value))
         g_transparentBackground = value != 0;
+    if (QueryDword(key, "ClockColor", &value) && IsSupportedClockColor((COLORREF)value))
+        g_clockColor = (COLORREF)value;
     QueryString(key, L"FontName", g_fontName, LF_FACESIZE);
 
     RegCloseKey(key);
@@ -441,6 +495,7 @@ static void SaveWindowState(HWND window)
     WriteDword(key, "FontStyle", (DWORD)g_fontStyle);
     WriteDword(key, "ShowMeridiem", g_showMeridiem ? 1 : 0);
     WriteDword(key, "TransparentBackground", g_transparentBackground ? 1 : 0);
+    WriteDword(key, "ClockColor", (DWORD)g_clockColor);
     WriteString(key, L"FontName", g_fontName);
     RegCloseKey(key);
 }
@@ -729,8 +784,12 @@ static int BuildDisplayText(WCHAR *text, int capacity)
     int i;
     int digitCount = g_showSeconds ? 8 : 5;
 
-    for (i = 0; i < digitCount && count < capacity - 1; ++i)
-        text[count++] = (WCHAR)(unsigned char)g_digits[i];
+    for (i = 0; i < digitCount && count < capacity - 1; ++i) {
+        WCHAR character = (WCHAR)(unsigned char)g_digits[i];
+        if (character == L':' && !g_colonVisible)
+            character = L' ';
+        text[count++] = character;
+    }
 
     if (g_timeFormat == kFormat12 && g_showMeridiem && count < capacity - 4) {
         text[count++] = L' ';
@@ -810,7 +869,7 @@ static BOOL PaintSystemFontClock(HWND window, HDC dc, const RECT *client)
     x = (clientWidth - textSize.cx) / 2;
     y = (clientHeight - textSize.cy) / 2;
     oldBkMode = SetBkMode(dc, TRANSPARENT);
-    oldColor = SetTextColor(dc, RGB(0, 255, 0));
+    oldColor = SetTextColor(dc, g_clockColor);
     TextOutW(dc, x, y, text, textLength);
     SetTextColor(dc, oldColor);
     SetBkMode(dc, oldBkMode);
@@ -822,10 +881,10 @@ static BOOL PaintSystemFontClock(HWND window, HDC dc, const RECT *client)
 static void PaintClock(HWND window, HDC dc)
 {
     RECT client;
-    HBRUSH green;
+    HBRUSH clockBrush;
     HBRUSH black;
     HBRUSH oldBrush;
-    HPEN greenPen;
+    HPEN clockPen;
     HPEN oldPen;
     int clientWidth;
     int clientHeight;
@@ -858,40 +917,40 @@ static void PaintClock(HWND window, HDC dc)
     offsetX = (clientWidth - drawWidth) / 2;
     offsetY = (clientHeight - drawHeight) / 2;
 
-    green = CreateSolidBrush(RGB(0, 255, 0));
-    greenPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
-    if (!green || !greenPen) {
-        if (greenPen) DeleteObject(greenPen);
-        if (green) DeleteObject(green);
+    clockBrush = CreateSolidBrush(g_clockColor);
+    clockPen = CreatePen(PS_SOLID, 1, g_clockColor);
+    if (!clockBrush || !clockPen) {
+        if (clockPen) DeleteObject(clockPen);
+        if (clockBrush) DeleteObject(clockBrush);
         return;
     }
-    oldBrush = (HBRUSH)SelectObject(dc, green);
-    oldPen = (HPEN)SelectObject(dc, greenPen);
+    oldBrush = (HBRUSH)SelectObject(dc, clockBrush);
+    oldPen = (HPEN)SelectObject(dc, clockPen);
 
-    DrawDigit(window, dc, 8, 7, g_digits[0] - '0', offsetX, offsetY, scale, green);
-    DrawDigit(window, dc, 39, 7, g_digits[1] - '0', offsetX, offsetY, scale, green);
+    DrawDigit(window, dc, 8, 7, g_digits[0] - '0', offsetX, offsetY, scale, clockBrush);
+    DrawDigit(window, dc, 39, 7, g_digits[1] - '0', offsetX, offsetY, scale, clockBrush);
     if (g_colonVisible)
-        DrawColon(dc, 72, offsetX, offsetY, scale, green);
-    DrawDigit(window, dc, 85, 7, g_digits[3] - '0', offsetX, offsetY, scale, green);
-    DrawDigit(window, dc, 116, 7, g_digits[4] - '0', offsetX, offsetY, scale, green);
+        DrawColon(dc, 72, offsetX, offsetY, scale, clockBrush);
+    DrawDigit(window, dc, 85, 7, g_digits[3] - '0', offsetX, offsetY, scale, clockBrush);
+    DrawDigit(window, dc, 116, 7, g_digits[4] - '0', offsetX, offsetY, scale, clockBrush);
 
     if (g_showSeconds) {
         if (g_colonVisible)
-            DrawColon(dc, 149, offsetX, offsetY, scale, green);
-        DrawDigit(window, dc, 162, 7, g_digits[6] - '0', offsetX, offsetY, scale, green);
-        DrawDigit(window, dc, 193, 7, g_digits[7] - '0', offsetX, offsetY, scale, green);
+            DrawColon(dc, 149, offsetX, offsetY, scale, clockBrush);
+        DrawDigit(window, dc, 162, 7, g_digits[6] - '0', offsetX, offsetY, scale, clockBrush);
+        DrawDigit(window, dc, 193, 7, g_digits[7] - '0', offsetX, offsetY, scale, clockBrush);
     }
 
     if (g_timeFormat == kFormat12 && g_showMeridiem) {
         meridiemX = g_showSeconds ? 236 : 159;
-        DrawLetter(window, dc, meridiemX, 7, g_meridiem[0], offsetX, offsetY, scale, green);
-        DrawLetter(window, dc, meridiemX + 31, 7, g_meridiem[1], offsetX, offsetY, scale, green);
+        DrawLetter(window, dc, meridiemX, 7, g_meridiem[0], offsetX, offsetY, scale, clockBrush);
+        DrawLetter(window, dc, meridiemX + 31, 7, g_meridiem[1], offsetX, offsetY, scale, clockBrush);
     }
 
     SelectObject(dc, oldPen);
     SelectObject(dc, oldBrush);
-    DeleteObject(greenPen);
-    DeleteObject(green);
+    DeleteObject(clockPen);
+    DeleteObject(clockBrush);
 }
 
 static void ApplyLayoutSize(HWND window, int oldBaseWidth, int oldWidth, int oldHeight)
@@ -1083,6 +1142,20 @@ static void PopulateFontCombo(HWND window)
     SendMessageW(combo, CB_SETCURSEL, (WPARAM)selection, 0);
 }
 
+static void PopulateColorCombo(HWND window)
+{
+    HWND combo = GetDlgItem(window, kColorComboControl);
+    int i;
+    int selection = 0;
+
+    for (i = 0; i < kClockColorCount; ++i) {
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)kClockColorOptions[i].name);
+        if (kClockColorOptions[i].color == g_clockColor)
+            selection = i;
+    }
+    SendMessageW(combo, CB_SETCURSEL, (WPARAM)selection, 0);
+}
+
 static void ShowClockMenu(HWND window, int x, int y)
 {
     HMENU menu;
@@ -1150,6 +1223,37 @@ static void ApplySelectedFont(HWND settingsWindow)
     g_fontStyle = kFont7Segment;
 }
 
+static void ApplySelectedColor(HWND settingsWindow)
+{
+    HWND combo = GetDlgItem(settingsWindow, kColorComboControl);
+    LRESULT selection = SendMessageW(combo, CB_GETCURSEL, 0, 0);
+
+    if (selection >= 0 && selection < kClockColorCount)
+        g_clockColor = kClockColorOptions[(int)selection].color;
+}
+
+static void PreviewFontAndColor(HWND settingsWindow)
+{
+    if (!g_settingsOwner)
+        return;
+    ApplySelectedFont(settingsWindow);
+    ApplySelectedColor(settingsWindow);
+    InvalidateRect(g_settingsOwner, NULL, FALSE);
+}
+
+static void RestoreSettingsPreview()
+{
+    if (!g_settingsPreviewActive)
+        return;
+
+    g_fontStyle = g_previewFontStyle;
+    CopyWideString(g_fontName, g_previewFontName, LF_FACESIZE);
+    g_clockColor = g_previewClockColor;
+    g_settingsPreviewActive = FALSE;
+    if (g_settingsOwner)
+        InvalidateRect(g_settingsOwner, NULL, FALSE);
+}
+
 static void ApplySettings(HWND settingsWindow)
 {
     int oldBaseWidth = LayoutWidth();
@@ -1174,6 +1278,7 @@ static void ApplySettings(HWND settingsWindow)
     g_transparentBackground = SendMessageW(GetDlgItem(settingsWindow, kTransparentControl),
                                            BM_GETCHECK, 0, 0) == BST_CHECKED;
     ApplySelectedFont(settingsWindow);
+    ApplySelectedColor(settingsWindow);
 
     if (!ConfigureStartup(requestedStartup))
         MessageBoxW(settingsWindow,
@@ -1185,6 +1290,7 @@ static void ApplySettings(HWND settingsWindow)
     ApplyLayoutSize(g_settingsOwner, oldBaseWidth, oldWidth, oldHeight);
     UpdateDigits(g_settingsOwner);
     SaveWindowState(g_settingsOwner);
+    g_settingsPreviewActive = FALSE;
 }
 
 static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
@@ -1222,22 +1328,33 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
                         g_instance, NULL);
         CreateWindowExW(0, L"STATIC", kFontHintText,
                         WS_CHILD | WS_VISIBLE | SS_LEFT,
-                        16, 207, 452, 35, window, NULL, g_instance, NULL);
+                        16, 207, 452, 34, window, NULL, g_instance, NULL);
+        CreateWindowExW(0, L"STATIC", L"Clock Color",
+                        WS_CHILD | WS_VISIBLE,
+                        16, 244, 450, 20, window, NULL, g_instance, NULL);
+        CreateWindowExW(WS_EX_CLIENTEDGE, L"COMBOBOX", L"",
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
+                        CBS_DROPDOWNLIST,
+                        16, 265, 452, 190, window, (HMENU)kColorComboControl,
+                        g_instance, NULL);
+        CreateWindowExW(0, L"STATIC", kLivePreviewHintText,
+                        WS_CHILD | WS_VISIBLE | SS_LEFT,
+                        16, 294, 452, 20, window, NULL, g_instance, NULL);
         CreateWindowExW(0, L"STATIC", kTransparentHintText,
                         WS_CHILD | WS_VISIBLE | SS_LEFT,
-                        16, 242, 452, 35, window, NULL, g_instance, NULL);
+                        16, 318, 452, 35, window, NULL, g_instance, NULL);
         CreateWindowExW(0, L"BUTTON", L"OK",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-                        176, 282, 64, 25, window, (HMENU)kOkControl,
+                        176, 360, 64, 25, window, (HMENU)kOkControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"BUTTON", L"Cancel",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                        248, 282, 64, 25, window, (HMENU)kCancelControl,
+                        248, 360, 64, 25, window, (HMENU)kCancelControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"STATIC", kSettingsCreditText,
                         WS_CHILD | WS_VISIBLE | SS_CENTER,
-                        10, 316, 480, 20, window, NULL, g_instance, NULL);
-        CreateSourceLink(window, 10, 340, 480, 22);
+                        10, 395, 480, 20, window, NULL, g_instance, NULL);
+        CreateSourceLink(window, 10, 419, 480, 22);
 
         SendMessageW(GetDlgItem(window, kShowSecondsControl), BM_SETCHECK,
                      g_showSeconds ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -1250,10 +1367,16 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
         SendMessageW(GetDlgItem(window, kTransparentControl), BM_SETCHECK,
                      g_transparentBackground ? BST_CHECKED : BST_UNCHECKED, 0);
         PopulateFontCombo(window);
+        PopulateColorCombo(window);
         SetFocus(GetDlgItem(window, kOkControl));
         return 0;
 
     case WM_COMMAND:
+        if (HIWORD(wParam) == CBN_SELCHANGE &&
+            (LOWORD(wParam) == kFontComboControl || LOWORD(wParam) == kColorComboControl)) {
+            PreviewFontAndColor(window);
+            return 0;
+        }
         if (HIWORD(wParam) == BN_CLICKED && LOWORD(wParam) == kOkControl) {
             ApplySettings(window);
             DestroyWindow(window);
@@ -1291,6 +1414,7 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
         return 0;
 
     case WM_NCDESTROY:
+        RestoreSettingsPreview();
         g_settingsWindow = NULL;
         if (g_settingsOwner) {
             EnableWindow(g_settingsOwner, TRUE);
@@ -1317,6 +1441,10 @@ static void ShowSettings(HWND owner)
 
     CenterOnOwnerMonitor(owner, kSettingsWidth, kSettingsHeight, &x, &y);
     g_settingsOwner = owner;
+    g_previewFontStyle = g_fontStyle;
+    CopyWideString(g_previewFontName, g_fontName, LF_FACESIZE);
+    g_previewClockColor = g_clockColor;
+    g_settingsPreviewActive = TRUE;
     EnableWindow(owner, FALSE);
     g_settingsWindow = CreateWindowExW(WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
                                        kSettingsClassName, L"DAD Clock Settings",
@@ -1324,6 +1452,7 @@ static void ShowSettings(HWND owner)
                                        x, y, kSettingsWidth, kSettingsHeight,
                                        owner, NULL, g_instance, NULL);
     if (!g_settingsWindow) {
+        g_settingsPreviewActive = FALSE;
         EnableWindow(owner, TRUE);
         g_settingsOwner = NULL;
         return;
