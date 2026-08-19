@@ -6,6 +6,8 @@
 
 **A tiny native always-on-top digital clock for Windows XP through Windows 11.**
 
+[![Download Latest EXE](https://img.shields.io/badge/Download-Latest%20BABAClock.exe-2ea44f?style=for-the-badge&logo=windows)](https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/BABAClock.exe)
+
 [![Build Windows x86](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml/badge.svg)](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 ![Windows](https://img.shields.io/badge/Windows-XP%20%E2%86%92%2011-0078D6)
@@ -35,11 +37,15 @@ The current executable is built and validated by the repository's Windows GitHub
 
 ## Download
 
-The latest checked-in portable build is available directly from the repository:
+### [Download the latest BABAClock.exe](https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/BABAClock.exe)
 
-**[BABAClock.exe](BABAClock.exe)**
+This is a **stable direct-download link** to `BABAClock.exe` on the `main` branch. The repository workflow rebuilds and synchronizes the executable after successful changes, so this same link always points to the latest checked-in portable build.
 
-Copy it anywhere and run it. No installation is required.
+```text
+https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/BABAClock.exe
+```
+
+Copy the EXE anywhere and run it. No installation is required.
 
 > Windows may show a security warning because the executable is not code-signed. The complete source, build script, resource files, and CI validation are included in this repository.
 
