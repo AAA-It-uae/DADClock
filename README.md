@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="assets/BABAClock-11-11.svg" width="220" alt="BABA Clock 11:11 icon">
+<img src="assets/DADClock-11-11.svg" width="220" alt="DAD Clock 11:11 icon">
 
-# BABA Clock
+# DAD Clock
 
 **A tiny native always-on-top digital clock for Windows XP through Windows 11.**
 
-[![Download Latest EXE](https://img.shields.io/badge/Download-Latest%20BABAClock.exe-2ea44f?style=for-the-badge&logo=windows)](https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/BABAClock.exe)
+[![Download Latest EXE](https://img.shields.io/badge/Download-Latest%20DADClock.exe-2ea44f?style=for-the-badge&logo=windows)](https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/DADClock.exe)
 
 [![Build Windows x86](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml/badge.svg)](https://github.com/AAA-It-uae/DADClock/actions/workflows/build-windows.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -23,61 +23,54 @@
 
 ## Overview
 
-**BABA Clock** is a small desktop clock overlay designed to stay visible above normal Windows applications without bringing a framework, installer, runtime package, font bundle, or configuration file with it.
+**DAD Clock** is a small desktop clock overlay designed to stay visible above normal Windows applications without bringing a framework, installer, runtime package, font bundle, or configuration file with it.
 
 The application is written in **C++ using the Win32 API and GDI** and is built as a native **32-bit x86 Windows executable**.
 
 The runtime deliverable is simply:
 
 ```text
-BABAClock.exe
+DADClock.exe
 ```
-
-The current executable is built and validated by the repository's Windows GitHub Actions workflow.
 
 ## Download
 
-### [Download the latest BABAClock.exe](https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/BABAClock.exe)
+### [Download the latest DADClock.exe](https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/DADClock.exe)
 
-This is a **stable direct-download link** to `BABAClock.exe` on the `main` branch. The repository workflow rebuilds and synchronizes the executable after successful changes, so this same link always points to the latest checked-in portable build.
+This is a stable direct-download link to the executable on the `main` branch. The repository workflow rebuilds and synchronizes the EXE after successful source changes, so the same URL always points to the latest checked-in portable build.
 
 ```text
-https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/BABAClock.exe
+https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/DADClock.exe
 ```
 
 Copy the EXE anywhere and run it. No installation is required.
 
-> Windows may show a security warning because the executable is not code-signed. The complete source, build script, resource files, and CI validation are included in this repository.
+> Windows may show a security warning because the executable is not code-signed. The source, build script, resources, and CI validation are all available in this repository.
 
 ## Features
-
-The following functionality is implemented in the current source:
 
 - **Always-on-top** clock overlay
 - Borderless black clock surface
 - Optional **transparent background** so only the clock digits remain visible
 - Bright green digital display
 - Native **GDI** rendering
-- Two clock styles that are always available without external fonts:
+- Two built-in clock styles that require no external font files:
   - **7-Segment**
   - **Digital Classic**
 - Optional use of **font families installed on the current Windows system**
 - **24-hour** and **12-hour** formats
-- Optional digital **AM / PM** indicator in 12-hour mode
+- Optional **AM / PM** indicator in 12-hour mode
 - 12-hour mode can be used **with or without AM / PM**
 - Immediate time-format switching from the right-click menu
 - Optional **seconds** display
 - Optional **blinking colon** when seconds are hidden
 - Balanced separator/colon spacing between digit groups
 - Drag the clock anywhere with the left mouse button
-- Resize from edges or corners
-- Fixed aspect ratio during resizing so digits do not deform
-- Persistent window position and size
+- Resize from edges or corners while preserving aspect ratio
+- Persistent window position, size, and display settings
 - Automatic recovery into a visible monitor work area after display-layout changes
-- Persistent display settings
 - Optional **Run at Windows Startup**
-- Settings window centered on the monitor containing the clock
-- About window centered on the monitor containing the clock
+- Settings and About windows centered on the monitor containing the clock
 - Clickable source repository link
 - First-run dedication message shown only once
 - Embedded application icon
@@ -95,7 +88,7 @@ The following functionality is implemented in the current source:
 | `Time Format → 24-Hour` | Switch immediately to 24-hour time |
 | `Time Format → 12-Hour` | Switch immediately to 12-hour time |
 | `About` | Show project and technical information |
-| `Exit` | Close BABA Clock |
+| `Exit` | Close DAD Clock |
 
 ## Settings
 
@@ -109,27 +102,20 @@ When seconds are hidden, the hour/minute separator can blink once per second.
 
 ### Run at Windows Startup
 
-Adds or removes BABA Clock from the current user's Windows startup registry entry.
+Adds or removes DAD Clock from the current user's Windows startup registry entry.
 
-The Settings checkbox reflects the actual startup command stored by Windows. If the EXE is moved after enabling startup, open Settings and enable the option again so Windows stores the new executable path.
+The checkbox reflects the actual startup command stored by Windows. If the EXE is moved after enabling startup, open Settings and enable the option again so Windows stores the new executable path.
 
 ### Show AM / PM in 12-Hour Mode
 
 Controls whether the `AM` or `PM` indicator is drawn when 12-hour mode is active.
 
-This allows both forms:
+Examples:
 
 ```text
 11:57 PM
-```
-
-and:
-
-```text
 11:57
 ```
-
-while still using 12-hour clock conversion.
 
 ### Transparent Background
 
@@ -139,27 +125,25 @@ When transparent mode is enabled, drag from a visible digit to move the clock. D
 
 ### Clock Font
 
-The font selector contains two built-in styles first:
+The font selector always contains the two built-in styles first:
 
 - **Built-in: 7-Segment**
 - **Built-in: Digital Classic**
 
-It then enumerates font families installed on the current Windows PC. Selecting one of those entries renders the clock text using that local Windows font through GDI.
+It then enumerates font families installed on the current Windows PC. Selecting one renders the clock through GDI using that local Windows font.
 
-No font file is shipped with BABA Clock. The two built-in digital styles remain available on every supported system even when a selected system font is not present on another PC.
+No font file is shipped with DAD Clock. The two built-in digital styles remain available on every supported system.
 
-## Time format
+## Time formats
 
 The default format is **24-hour**.
-
-Examples:
 
 ```text
 23:57
 23:57:42
 ```
 
-In **12-hour** mode the application can render with AM/PM:
+12-hour mode can render with AM/PM:
 
 ```text
 11:57 PM
@@ -173,31 +157,31 @@ or without AM/PM:
 11:57:42
 ```
 
-Only one time format is active at a time. The active format is check-marked in the right-click menu and is restored on the next launch.
+The active format is check-marked in the right-click menu and restored on the next launch.
 
 ## Multi-monitor behavior
 
-Settings and About are centered inside the usable work area of the monitor that contains the clock instead of being centered relative to the clock window itself.
+Settings and About are centered inside the usable work area of the monitor containing the clock.
 
-The saved clock rectangle is also checked against the currently available monitor work areas when the application starts or Windows reports a display-layout change. If a previously used monitor has been disconnected, BABA Clock is moved back into a visible work area.
+The saved clock rectangle is checked against the currently available monitor work areas when DAD Clock starts or Windows reports a display-layout change. If a previously used monitor has been disconnected, the clock is moved back into a visible work area.
 
 ## First run
 
-On the first launch only, BABA Clock displays:
+On the first launch only, DAD Clock displays:
 
 > **Made with love for my beloved father ♥**
 
-The first-run state is then stored in the current user's registry so the message is not automatically shown again.
+The state is then stored in the current user's registry so the message is not automatically shown again.
 
 ## Saved state
 
-Application state is stored under:
+Current settings are stored under:
 
 ```text
-HKEY_CURRENT_USER\Software\BABA Clock
+HKEY_CURRENT_USER\Software\DAD Clock
 ```
 
-The source persists:
+The application persists:
 
 - X / Y position
 - width / height
@@ -217,7 +201,13 @@ Windows startup registration uses:
 HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
 ```
 
-The real Windows Run entry is treated as the source of truth for the startup checkbox.
+with the value name:
+
+```text
+DAD Clock
+```
+
+For users upgrading from the earlier project name, the application can read the previous registry state as a one-way compatibility fallback; new saves and startup registration use the **DAD Clock** name.
 
 No `.ini`, JSON, local database, or external settings file is required.
 
@@ -242,7 +232,7 @@ _WIN32_WINNT 0x0501
 WINVER       0x0501
 ```
 
-and the application remains on classic Win32/GDI APIs rather than introducing a modern framework or runtime requirement.
+and stays on classic Win32/GDI APIs rather than introducing a modern framework or runtime requirement.
 
 The CI pipeline verifies the PE subsystem and dependency contract. Formal behavioral certification on every historical Windows release still requires running the binary on those operating systems or representative VMs.
 
@@ -287,33 +277,31 @@ The build script:
 1. locates an installed Visual Studio C++ toolchain,
 2. initializes the x86 compiler environment,
 3. compiles `clock.cpp`,
-4. compiles `BABAClock.rc`,
+4. compiles `DADClock.rc`,
 5. links for `WINDOWS,5.01`,
 6. uses `/NODEFAULTLIB`,
 7. uses the custom `EntryPoint`,
 8. removes temporary object/resource files,
-9. leaves the portable `BABAClock.exe`.
+9. leaves the portable `DADClock.exe`.
 
-The application icon is already checked in, so Pillow is **not** needed just to compile the application.
+The application icon is generated by the repository artwork script in CI. Pillow is a developer/CI dependency only; it is never needed to run DAD Clock.
 
 ## Rebuild the artwork
 
-The visual identity is kept reproducible instead of depending on an opaque binary design source:
+The visual identity is generated from reproducible project assets:
 
-- `assets/BABAClock-11-11.svg` — vector reference artwork
+- `assets/DADClock-11-11.svg` — vector reference artwork
 - `make_icon.py` — raster asset generator
-- `assets/BABAClock-11-11.png` — generated preview
-- `BABAClock.ico` — generated multi-size Windows icon
-- `assets/BABAClock-11-11.ico` — generated release copy
+- `assets/DADClock-11-11.png` — generated preview
+- `DADClock.ico` — generated multi-size Windows icon
+- `assets/DADClock-11-11.ico` — generated release copy
 
-To regenerate the raster assets manually:
+To regenerate raster assets manually:
 
 ```bash
 python -m pip install pillow
 python make_icon.py
 ```
-
-Pillow is a **developer/CI-only** dependency. It is never required to run BABA Clock.
 
 ## Continuous build verification
 
@@ -321,11 +309,11 @@ The repository contains a Windows GitHub Actions workflow that runs on **Windows
 
 The pipeline:
 
-1. regenerates the 11:11 application assets,
-2. builds `BABAClock.exe`,
+1. regenerates the DAD Clock application assets,
+2. builds `DADClock.exe`,
 3. validates the resulting PE,
 4. calculates SHA-256,
-5. uploads a portable build artifact,
+5. uploads the `DADClock-Windows-x86` portable build artifact,
 6. on successful pushes to `main`, synchronizes generated PNG/ICO/EXE files back to the repository.
 
 `tools/verify_pe.py` checks that the executable is:
@@ -338,8 +326,6 @@ The pipeline:
 - carrying an embedded icon resource
 - below the project's 1 MB sanity limit
 
-The upgraded display/settings build remains approximately **75 KB** while retaining the embedded multi-size application icon.
-
 ## Project structure
 
 ```text
@@ -347,14 +333,14 @@ DADClock/
 ├─ .github/workflows/
 │  └─ build-windows.yml
 ├─ assets/
-│  ├─ BABAClock-11-11.svg
-│  ├─ BABAClock-11-11.png
-│  └─ BABAClock-11-11.ico
+│  ├─ DADClock-11-11.svg
+│  ├─ DADClock-11-11.png
+│  └─ DADClock-11-11.ico
 ├─ tools/
 │  └─ verify_pe.py
-├─ BABAClock.exe
-├─ BABAClock.ico
-├─ BABAClock.rc
+├─ DADClock.exe
+├─ DADClock.ico
+├─ DADClock.rc
 ├─ build.bat
 ├─ clock.cpp
 ├─ make_icon.py
@@ -369,7 +355,7 @@ DADClock/
 The application identifies the project as:
 
 ```text
-BABA Clock
+DAD Clock
 Built by Mohammad Taghi Alavi
 Idea by Abbas Alavi
 Made with love ♥
@@ -383,7 +369,7 @@ Source: https://github.com/AAA-It-uae/DADClock
 
 ## License
 
-BABA Clock is open source under the **Apache License 2.0**.
+DAD Clock is open source under the **Apache License 2.0**.
 
 See [LICENSE](LICENSE) for the license terms and [NOTICE](NOTICE) for project attribution.
 
@@ -395,7 +381,7 @@ See [LICENSE](LICENSE) for the license terms and [NOTICE](NOTICE) for project at
 
 <div align="center">
 
-### BABA Clock
+### DAD Clock
 
 **Small. Native. Portable.**
 
