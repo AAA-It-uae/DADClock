@@ -49,24 +49,29 @@ The following functionality is implemented in the current source:
 
 - **Always-on-top** clock overlay
 - Borderless black clock surface
+- Optional **transparent background** so only the clock digits remain visible
 - Bright green digital display
-- Native **GDI** rendering with no external clock font
-- Two clock styles:
+- Native **GDI** rendering
+- Two clock styles that are always available without external fonts:
   - **7-Segment**
   - **Digital Classic**
+- Optional use of **font families installed on the current Windows system**
 - **24-hour** and **12-hour** formats
-- Digital **AM / PM** indicator in 12-hour mode
+- Optional digital **AM / PM** indicator in 12-hour mode
+- 12-hour mode can be used **with or without AM / PM**
 - Immediate time-format switching from the right-click menu
 - Optional **seconds** display
 - Optional **blinking colon** when seconds are hidden
+- Balanced separator/colon spacing between digit groups
 - Drag the clock anywhere with the left mouse button
 - Resize from edges or corners
 - Fixed aspect ratio during resizing so digits do not deform
 - Persistent window position and size
+- Automatic recovery into a visible monitor work area after display-layout changes
 - Persistent display settings
 - Optional **Run at Windows Startup**
-- Settings window
-- About window
+- Settings window centered on the monitor containing the clock
+- About window centered on the monitor containing the clock
 - Clickable source repository link
 - First-run dedication message shown only once
 - Embedded application icon
@@ -80,9 +85,9 @@ The following functionality is implemented in the current source:
 | Left-drag | Move the clock |
 | Drag an edge or corner | Resize while preserving aspect ratio |
 | Right-click | Open the clock menu |
-| `Settings` | Open display and startup settings |
+| `Settings` | Open display, font, transparency, and startup settings |
 | `Time Format → 24-Hour` | Switch immediately to 24-hour time |
-| `Time Format → 12-Hour` | Switch immediately to 12-hour time with AM/PM |
+| `Time Format → 12-Hour` | Switch immediately to 12-hour time |
 | `About` | Show project and technical information |
 | `Exit` | Close BABA Clock |
 
@@ -100,16 +105,42 @@ When seconds are hidden, the hour/minute separator can blink once per second.
 
 Adds or removes BABA Clock from the current user's Windows startup registry entry.
 
-If the EXE is moved after enabling startup, disable and re-enable the option so Windows stores the new executable path.
+The Settings checkbox reflects the actual startup command stored by Windows. If the EXE is moved after enabling startup, open Settings and enable the option again so Windows stores the new executable path.
+
+### Show AM / PM in 12-Hour Mode
+
+Controls whether the `AM` or `PM` indicator is drawn when 12-hour mode is active.
+
+This allows both forms:
+
+```text
+11:57 PM
+```
+
+and:
+
+```text
+11:57
+```
+
+while still using 12-hour clock conversion.
+
+### Transparent Background
+
+Uses the classic Win32 layered-window color key to make the black clock surface transparent while keeping the green digits visible.
+
+When transparent mode is enabled, drag from a visible digit to move the clock. Disable transparency temporarily if you need the easiest access to the full resize area.
 
 ### Clock Font
 
-Choose between:
+The font selector contains two built-in styles first:
 
-- **7-Segment**
-- **Digital Classic**
+- **Built-in: 7-Segment**
+- **Built-in: Digital Classic**
 
-Both are rendered directly with GDI.
+It then enumerates font families installed on the current Windows PC. Selecting one of those entries renders the clock text using that local Windows font through GDI.
+
+No font file is shipped with BABA Clock. The two built-in digital styles remain available on every supported system even when a selected system font is not present on another PC.
 
 ## Time format
 
@@ -122,14 +153,27 @@ Examples:
 23:57:42
 ```
 
-In **12-hour** mode the application renders AM/PM beside the clock:
+In **12-hour** mode the application can render with AM/PM:
 
 ```text
 11:57 PM
 11:57:42 PM
 ```
 
-Only one format is active at a time. The active option is check-marked in the right-click menu and the selection is restored on the next launch.
+or without AM/PM:
+
+```text
+11:57
+11:57:42
+```
+
+Only one time format is active at a time. The active format is check-marked in the right-click menu and is restored on the next launch.
+
+## Multi-monitor behavior
+
+Settings and About are centered inside the usable work area of the monitor that contains the clock instead of being centered relative to the clock window itself.
+
+The saved clock rectangle is also checked against the currently available monitor work areas when the application starts or Windows reports a display-layout change. If a previously used monitor has been disconnected, BABA Clock is moved back into a visible work area.
 
 ## First run
 
@@ -153,9 +197,12 @@ The source persists:
 - width / height
 - seconds visibility
 - colon blinking
-- startup preference
+- startup preference snapshot
 - 12/24-hour format
-- clock style
+- AM/PM visibility preference
+- transparent-background preference
+- clock rendering style
+- selected Windows font family name
 - first-run state
 
 Windows startup registration uses:
@@ -163,6 +210,8 @@ Windows startup registration uses:
 ```text
 HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
 ```
+
+The real Windows Run entry is treated as the source of truth for the startup checkbox.
 
 No `.ini`, JSON, local database, or external settings file is required.
 
@@ -187,7 +236,7 @@ _WIN32_WINNT 0x0501
 WINVER       0x0501
 ```
 
-and avoids newer Win32 APIs in the application code.
+and the application remains on classic Win32/GDI APIs rather than introducing a modern framework or runtime requirement.
 
 The CI pipeline verifies the PE subsystem and dependency contract. Formal behavioral certification on every historical Windows release still requires running the binary on those operating systems or representative VMs.
 
@@ -198,6 +247,8 @@ The CI pipeline verifies the PE subsystem and dependency contract. Formal behavi
 | Language | C++ |
 | Windowing | Win32 API |
 | Rendering | GDI |
+| Transparency | Win32 layered-window color key |
+| System font discovery | GDI font-family enumeration |
 | Architecture | x86 / 32-bit |
 | Target subsystem | Windows GUI 5.01 |
 | UI framework | None |
@@ -244,7 +295,7 @@ The application icon is already checked in, so Pillow is **not** needed just to 
 The visual identity is kept reproducible instead of depending on an opaque binary design source:
 
 - `assets/BABAClock-11-11.svg` — vector reference artwork
-- `make_icon.py` — deterministic raster asset generator
+- `make_icon.py` — raster asset generator
 - `assets/BABAClock-11-11.png` — generated preview
 - `BABAClock.ico` — generated multi-size Windows icon
 - `assets/BABAClock-11-11.ico` — generated release copy
@@ -281,7 +332,7 @@ The pipeline:
 - carrying an embedded icon resource
 - below the project's 1 MB sanity limit
 
-The validated runner build is currently approximately **71 KB**, while still containing the embedded multi-size application icon.
+The upgraded display/settings build remains approximately **75 KB** while retaining the embedded multi-size application icon.
 
 ## Project structure
 
