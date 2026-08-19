@@ -53,6 +53,7 @@ static const UINT kSourceLinkControl = 208;
 static const UINT kShowMeridiemControl = 209;
 static const UINT kTransparentControl = 210;
 static const UINT kColorComboControl = 211;
+static const UINT kPreviewControl = 212;
 
 static const int kFormat24 = 0;
 static const int kFormat12 = 1;
@@ -65,7 +66,7 @@ static const int k24SecondsWidth = 228;
 static const int k12MinutesWidth = 224;
 static const int k12SecondsWidth = 301;
 static const int kSettingsWidth = 500;
-static const int kSettingsHeight = 475;
+static const int kSettingsHeight = 565;
 static const int kAboutWidth = 520;
 static const int kAboutHeight = 350;
 
@@ -103,7 +104,7 @@ static const WCHAR kSettingsCreditText[] =
 static const WCHAR kFontHintText[] =
     L"Built-in styles are always available. Other entries are fonts installed on this Windows PC.";
 static const WCHAR kLivePreviewHintText[] =
-    L"Font and color changes preview live on the clock. Cancel restores the previous look.";
+    L"The fixed 11:11 sample and the real clock update immediately. Cancel restores the previous look.";
 static const WCHAR kTransparentHintText[] =
     L"Transparent mode uses the classic Windows layered-window color key. Drag from a visible digit to move the clock.";
 
@@ -171,6 +172,15 @@ static void CopyWideString(WCHAR *destination, const WCHAR *source, int capacity
         ++i;
     }
     destination[i] = L'\0';
+}
+
+static int WideLength(const WCHAR *text)
+{
+    int length = 0;
+
+    while (text[length])
+        ++length;
+    return length;
 }
 
 static BOOL IsSupportedClockColor(COLORREF color)
@@ -359,6 +369,55 @@ static void ClampPositionToNearestMonitor(int *x, int *y, int width, int height)
     }
 }
 
+static void FitClockRectToNearestMonitor(int *x, int *y, int *width, int *height)
+{
+    RECT rect;
+    MONITORINFO info;
+    HMONITOR monitor;
+    int workWidth;
+    int workHeight;
+    int newWidth = *width;
+    int newHeight = *height;
+
+    rect.left = *x;
+    rect.top = *y;
+    rect.right = *x + *width;
+    rect.bottom = *y + *height;
+    monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+    if (!monitor) {
+        ClampPositionToNearestMonitor(x, y, *width, *height);
+        return;
+    }
+
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(monitor, &info)) {
+        ClampPositionToNearestMonitor(x, y, *width, *height);
+        return;
+    }
+
+    workWidth = info.rcWork.right - info.rcWork.left;
+    workHeight = info.rcWork.bottom - info.rcWork.top;
+    if (workWidth < 1 || workHeight < 1)
+        return;
+
+    if (newWidth > workWidth) {
+        newHeight = (newHeight * workWidth) / newWidth;
+        newWidth = workWidth;
+    }
+    if (newHeight > workHeight) {
+        newWidth = (newWidth * workHeight) / newHeight;
+        newHeight = workHeight;
+    }
+    if (newWidth < 1)
+        newWidth = 1;
+    if (newHeight < 1)
+        newHeight = 1;
+
+    *width = newWidth;
+    *height = newHeight;
+    ClampPositionToNearestMonitor(x, y, *width, *height);
+}
+
 static void CenterOnOwnerMonitor(HWND owner, int width, int height, int *x, int *y)
 {
     MONITORINFO info;
@@ -395,10 +454,11 @@ static void MoveClockIntoVisibleWorkArea(HWND window)
     y = rect.top;
     width = rect.right - rect.left;
     height = rect.bottom - rect.top;
-    ClampPositionToNearestMonitor(&x, &y, width, height);
-    if (x != rect.left || y != rect.top)
-        SetWindowPos(window, NULL, x, y, 0, 0,
-                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    FitClockRectToNearestMonitor(&x, &y, &width, &height);
+    if (x != rect.left || y != rect.top ||
+        width != rect.right - rect.left || height != rect.bottom - rect.top)
+        SetWindowPos(window, NULL, x, y, width, height,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 static void LoadState(int *x, int *y, int *width, int *height)
@@ -620,12 +680,11 @@ static void DrawScaledRect(HDC dc, int left, int top, int right, int bottom,
                            int offsetX, int offsetY, int scale, HBRUSH brush)
 {
     RECT r;
-    (void)brush;
     r.left = offsetX + Scaled(left, scale);
     r.top = offsetY + Scaled(top, scale);
     r.right = offsetX + Scaled(right, scale);
     r.bottom = offsetY + Scaled(bottom, scale);
-    FillRect(dc, &r, (HBRUSH)GetCurrentObject(dc, OBJ_BRUSH));
+    FillRect(dc, &r, brush);
 }
 
 static void DrawScaledPolygon(HDC dc, const int *coordinates, int count,
@@ -784,12 +843,8 @@ static int BuildDisplayText(WCHAR *text, int capacity)
     int i;
     int digitCount = g_showSeconds ? 8 : 5;
 
-    for (i = 0; i < digitCount && count < capacity - 1; ++i) {
-        WCHAR character = (WCHAR)(unsigned char)g_digits[i];
-        if (character == L':' && !g_colonVisible)
-            character = L' ';
-        text[count++] = character;
-    }
+    for (i = 0; i < digitCount && count < capacity - 1; ++i)
+        text[count++] = (WCHAR)(unsigned char)g_digits[i];
 
     if (g_timeFormat == kFormat12 && g_showMeridiem && count < capacity - 4) {
         text[count++] = L' ';
@@ -870,7 +925,24 @@ static BOOL PaintSystemFontClock(HWND window, HDC dc, const RECT *client)
     y = (clientHeight - textSize.cy) / 2;
     oldBkMode = SetBkMode(dc, TRANSPARENT);
     oldColor = SetTextColor(dc, g_clockColor);
-    TextOutW(dc, x, y, text, textLength);
+    if (g_colonVisible) {
+        TextOutW(dc, x, y, text, textLength);
+    } else {
+        int i;
+        for (i = 0; i < textLength; ++i) {
+            SIZE prefixSize;
+            int charX = x;
+
+            if (text[i] == L':')
+                continue;
+            if (i > 0) {
+                if (!GetTextExtentPoint32W(dc, text, i, &prefixSize))
+                    continue;
+                charX += prefixSize.cx;
+            }
+            TextOutW(dc, charX, y, &text[i], 1);
+        }
+    }
     SetTextColor(dc, oldColor);
     SetBkMode(dc, oldBkMode);
     SelectObject(dc, oldFont);
@@ -951,6 +1023,147 @@ static void PaintClock(HWND window, HDC dc)
     SelectObject(dc, oldBrush);
     DeleteObject(clockPen);
     DeleteObject(clockBrush);
+}
+
+static void PaintSettingsPreview(HWND settingsWindow, HDC dc, const RECT *rect)
+{
+    RECT area = *rect;
+    HBRUSH black = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    int width = area.right - area.left;
+    int height = area.bottom - area.top;
+
+    (void)settingsWindow;
+    FillRect(dc, &area, black);
+
+    if (g_fontStyle == kFontSystem) {
+        static const WCHAR sample[] = L"11:11";
+        HFONT font;
+        HFONT oldFont;
+        SIZE size;
+        int fontHeight = height * 7 / 10;
+        int x;
+        int y;
+        int oldBkMode;
+        COLORREF oldColor;
+
+        if (fontHeight < 8)
+            fontHeight = 8;
+        font = CreateFontW(-fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                           DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                           DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, g_fontName);
+        if (!font)
+            return;
+        oldFont = (HFONT)SelectObject(dc, font);
+        if (!GetTextExtentPoint32W(dc, sample, 5, &size)) {
+            SelectObject(dc, oldFont);
+            DeleteObject(font);
+            return;
+        }
+        if (size.cx > width - 16 && size.cx > 0) {
+            int adjusted = (fontHeight * (width - 16)) / size.cx;
+            if (adjusted < 6)
+                adjusted = 6;
+            SelectObject(dc, oldFont);
+            DeleteObject(font);
+            font = CreateFontW(-adjusted, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                               DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                               DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, g_fontName);
+            if (!font)
+                return;
+            oldFont = (HFONT)SelectObject(dc, font);
+            if (!GetTextExtentPoint32W(dc, sample, 5, &size)) {
+                SelectObject(dc, oldFont);
+                DeleteObject(font);
+                return;
+            }
+        }
+        x = area.left + (width - size.cx) / 2;
+        y = area.top + (height - size.cy) / 2;
+        oldBkMode = SetBkMode(dc, TRANSPARENT);
+        oldColor = SetTextColor(dc, g_clockColor);
+        TextOutW(dc, x, y, sample, 5);
+        SetTextColor(dc, oldColor);
+        SetBkMode(dc, oldBkMode);
+        SelectObject(dc, oldFont);
+        DeleteObject(font);
+        return;
+    }
+
+    {
+        int scaleX = ((width - 12) * 1000) / k24MinutesWidth;
+        int scaleY = ((height - 8) * 1000) / kBaseHeight;
+        int scale = scaleX < scaleY ? scaleX : scaleY;
+        int drawWidth;
+        int drawHeight;
+        int offsetX;
+        int offsetY;
+        HBRUSH brush;
+        HPEN pen;
+        HBRUSH oldBrush;
+        HPEN oldPen;
+
+        if (scale < 1)
+            scale = 1;
+        drawWidth = Scaled(k24MinutesWidth, scale);
+        drawHeight = Scaled(kBaseHeight, scale);
+        offsetX = area.left + (width - drawWidth) / 2;
+        offsetY = area.top + (height - drawHeight) / 2;
+        brush = CreateSolidBrush(g_clockColor);
+        pen = CreatePen(PS_SOLID, 1, g_clockColor);
+        if (!brush || !pen) {
+            if (pen) DeleteObject(pen);
+            if (brush) DeleteObject(brush);
+            return;
+        }
+        oldBrush = (HBRUSH)SelectObject(dc, brush);
+        oldPen = (HPEN)SelectObject(dc, pen);
+        DrawDigit(NULL, dc, 8, 7, 1, offsetX, offsetY, scale, brush);
+        DrawDigit(NULL, dc, 39, 7, 1, offsetX, offsetY, scale, brush);
+        DrawColon(dc, 72, offsetX, offsetY, scale, brush);
+        DrawDigit(NULL, dc, 85, 7, 1, offsetX, offsetY, scale, brush);
+        DrawDigit(NULL, dc, 116, 7, 1, offsetX, offsetY, scale, brush);
+        SelectObject(dc, oldPen);
+        SelectObject(dc, oldBrush);
+        DeleteObject(pen);
+        DeleteObject(brush);
+    }
+}
+
+static void DrawColorComboItem(const DRAWITEMSTRUCT *draw)
+{
+    RECT itemRect = draw->rcItem;
+    HBRUSH background;
+    COLORREF oldColor;
+    int oldBkMode;
+
+    if (draw->itemID == (UINT)-1 || draw->itemID >= (UINT)kClockColorCount)
+        return;
+
+    background = GetSysColorBrush((draw->itemState & ODS_SELECTED) ?
+                                  COLOR_HIGHLIGHT : COLOR_WINDOW);
+    FillRect(draw->hDC, &itemRect, background);
+
+    {
+        RECT swatch = itemRect;
+        HBRUSH swatchBrush = CreateSolidBrush(kClockColorOptions[draw->itemID].color);
+        swatch.left += 5;
+        swatch.top += 4;
+        swatch.right = swatch.left + 24;
+        swatch.bottom -= 4;
+        if (swatchBrush) {
+            FillRect(draw->hDC, &swatch, swatchBrush);
+            DeleteObject(swatchBrush);
+        }
+    }
+
+    oldBkMode = SetBkMode(draw->hDC, TRANSPARENT);
+    oldColor = SetTextColor(draw->hDC, (draw->itemState & ODS_SELECTED) ?
+                            RGB(255, 255, 255) : RGB(0, 0, 0));
+    TextOutW(draw->hDC, itemRect.left + 36, itemRect.top + 4,
+             kClockColorOptions[draw->itemID].name,
+             WideLength(kClockColorOptions[draw->itemID].name));
+    SetTextColor(draw->hDC, oldColor);
+    SetBkMode(draw->hDC, oldBkMode);
 }
 
 static void ApplyLayoutSize(HWND window, int oldBaseWidth, int oldWidth, int oldHeight)
@@ -1086,7 +1299,7 @@ static int CALLBACK FontEnumProc(const LOGFONTW *logFont, const TEXTMETRICW *,
     HWND combo = (HWND)lParam;
     const WCHAR *face = logFont->lfFaceName;
 
-    if (!face[0] || face[0] == L'@')
+    if (!face[0] || face[0] == L'@' || logFont->lfCharSet == SYMBOL_CHARSET)
         return 1;
     if (SendMessageW(combo, CB_FINDSTRINGEXACT, (WPARAM)-1, (LPARAM)face) == CB_ERR)
         SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)face);
@@ -1239,6 +1452,7 @@ static void PreviewFontAndColor(HWND settingsWindow)
     ApplySelectedFont(settingsWindow);
     ApplySelectedColor(settingsWindow);
     InvalidateRect(g_settingsOwner, NULL, FALSE);
+    InvalidateRect(GetDlgItem(settingsWindow, kPreviewControl), NULL, TRUE);
 }
 
 static void RestoreSettingsPreview()
@@ -1318,43 +1532,50 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
                         16, 126, 450, 24, window, (HMENU)kTransparentControl,
                         g_instance, NULL);
+        CreateWindowExW(0, L"STATIC", L"Preview",
+                        WS_CHILD | WS_VISIBLE,
+                        16, 158, 450, 18, window, NULL, g_instance, NULL);
+        CreateWindowExW(WS_EX_CLIENTEDGE, L"STATIC", L"",
+                        WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
+                        16, 178, 452, 60, window, (HMENU)kPreviewControl,
+                        g_instance, NULL);
         CreateWindowExW(0, L"STATIC", L"Clock Font",
                         WS_CHILD | WS_VISIBLE,
-                        16, 158, 450, 20, window, NULL, g_instance, NULL);
+                        16, 246, 450, 18, window, NULL, g_instance, NULL);
         CreateWindowExW(WS_EX_CLIENTEDGE, L"COMBOBOX", L"",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
                         CBS_DROPDOWNLIST,
-                        16, 179, 452, 210, window, (HMENU)kFontComboControl,
+                        16, 266, 452, 210, window, (HMENU)kFontComboControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"STATIC", kFontHintText,
                         WS_CHILD | WS_VISIBLE | SS_LEFT,
-                        16, 207, 452, 34, window, NULL, g_instance, NULL);
+                        16, 294, 452, 32, window, NULL, g_instance, NULL);
         CreateWindowExW(0, L"STATIC", L"Clock Color",
                         WS_CHILD | WS_VISIBLE,
-                        16, 244, 450, 20, window, NULL, g_instance, NULL);
+                        16, 329, 450, 18, window, NULL, g_instance, NULL);
         CreateWindowExW(WS_EX_CLIENTEDGE, L"COMBOBOX", L"",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
-                        CBS_DROPDOWNLIST,
-                        16, 265, 452, 190, window, (HMENU)kColorComboControl,
+                        CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS,
+                        16, 349, 452, 190, window, (HMENU)kColorComboControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"STATIC", kLivePreviewHintText,
                         WS_CHILD | WS_VISIBLE | SS_LEFT,
-                        16, 294, 452, 20, window, NULL, g_instance, NULL);
+                        16, 378, 452, 20, window, NULL, g_instance, NULL);
         CreateWindowExW(0, L"STATIC", kTransparentHintText,
                         WS_CHILD | WS_VISIBLE | SS_LEFT,
-                        16, 318, 452, 35, window, NULL, g_instance, NULL);
+                        16, 402, 452, 34, window, NULL, g_instance, NULL);
         CreateWindowExW(0, L"BUTTON", L"OK",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-                        176, 360, 64, 25, window, (HMENU)kOkControl,
+                        176, 444, 64, 25, window, (HMENU)kOkControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"BUTTON", L"Cancel",
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                        248, 360, 64, 25, window, (HMENU)kCancelControl,
+                        248, 444, 64, 25, window, (HMENU)kCancelControl,
                         g_instance, NULL);
         CreateWindowExW(0, L"STATIC", kSettingsCreditText,
                         WS_CHILD | WS_VISIBLE | SS_CENTER,
-                        10, 395, 480, 20, window, NULL, g_instance, NULL);
-        CreateSourceLink(window, 10, 419, 480, 22);
+                        10, 477, 480, 20, window, NULL, g_instance, NULL);
+        CreateSourceLink(window, 10, 500, 480, 22);
 
         SendMessageW(GetDlgItem(window, kShowSecondsControl), BM_SETCHECK,
                      g_showSeconds ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -1368,6 +1589,11 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
                      g_transparentBackground ? BST_CHECKED : BST_UNCHECKED, 0);
         PopulateFontCombo(window);
         PopulateColorCombo(window);
+        SendMessageW(GetDlgItem(window, kColorComboControl), CB_SETITEMHEIGHT,
+                     (WPARAM)-1, 22);
+        SendMessageW(GetDlgItem(window, kColorComboControl), CB_SETITEMHEIGHT,
+                     0, 22);
+        InvalidateRect(GetDlgItem(window, kPreviewControl), NULL, TRUE);
         SetFocus(GetDlgItem(window, kOkControl));
         return 0;
 
@@ -1391,6 +1617,27 @@ static LRESULT CALLBACK SettingsWindowProc(HWND window, UINT message,
             return 0;
         }
         return 0;
+
+    case WM_MEASUREITEM:
+        if (wParam == kColorComboControl) {
+            ((MEASUREITEMSTRUCT *)lParam)->itemHeight = 22;
+            return TRUE;
+        }
+        break;
+
+    case WM_DRAWITEM:
+    {
+        DRAWITEMSTRUCT *draw = (DRAWITEMSTRUCT *)lParam;
+        if (draw->CtlID == kPreviewControl) {
+            PaintSettingsPreview(window, draw->hDC, &draw->rcItem);
+            return TRUE;
+        }
+        if (draw->CtlID == kColorComboControl) {
+            DrawColorComboItem(draw);
+            return TRUE;
+        }
+        break;
+    }
 
     case WM_CTLCOLORSTATIC:
         return LinkColor(window, wParam, lParam);
@@ -1758,7 +2005,7 @@ static int RunClock(HINSTANCE instance)
     x = (GetSystemMetrics(SM_CXSCREEN) - k24MinutesWidth) / 2;
     y = (GetSystemMetrics(SM_CYSCREEN) - kBaseHeight) / 2;
     LoadState(&x, &y, &width, &height);
-    ClampPositionToNearestMonitor(&x, &y, width, height);
+    FitClockRectToNearestMonitor(&x, &y, &width, &height);
     if (!RegisterWindowClasses())
         return 1;
 

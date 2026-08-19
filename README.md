@@ -33,6 +33,8 @@ The runtime deliverable is simply:
 DADClock.exe
 ```
 
+Windows file properties expose native product metadata for **DAD Clock 1.0.0** through the executable's VERSIONINFO resource.
+
 ## Download
 
 ### [Download the latest DADClock.exe](https://raw.githubusercontent.com/AAA-It-uae/DADClock/main/DADClock.exe)
@@ -68,6 +70,8 @@ Copy the EXE anywhere and run it. No installation is required.
   - **Digital Classic**
 - Optional use of **font families installed on the current Windows system**
 - **Live font and color preview** directly on the clock while Settings is open
+- Fixed **11:11 preview panel** inside Settings using the currently selected font and color
+- Color selector entries include visual color swatches
 - Canceling Settings restores the previous font and color preview
 - **24-hour** and **12-hour** formats
 - Optional **AM / PM** indicator in 12-hour mode
@@ -76,11 +80,13 @@ Copy the EXE anywhere and run it. No installation is required.
 - Optional **seconds** display
 - Optional **blinking colon** when seconds are hidden
 - Colon blinking works with both built-in digital styles and installed Windows fonts
+- Windows-font colon blinking reserves the original colon width, so the clock does not shift horizontally while blinking
 - Balanced separator/colon spacing between digit groups
 - Drag the clock anywhere with the left mouse button
 - Resize from edges or corners while preserving aspect ratio
 - Persistent window position, size, color, and display settings
 - Automatic recovery into a visible monitor work area after display-layout changes
+- Oversized saved clock windows are scaled down proportionally when moved to a smaller monitor
 - Optional **Run at Windows Startup**
 - Settings and About windows centered on the monitor containing the clock
 - Clickable source repository link
@@ -144,7 +150,7 @@ The font selector always contains the two built-in styles first:
 - **Built-in: 7-Segment**
 - **Built-in: Digital Classic**
 
-It then enumerates font families installed on the current Windows PC. Selecting one renders the clock through GDI using that local Windows font.
+It then enumerates font families installed on the current Windows PC. Vertical aliases and Symbol-character-set fonts are filtered from the normal clock-font list. Selecting a font renders the clock through GDI using that local Windows font.
 
 No font file is shipped with DAD Clock. The two built-in digital styles remain available on every supported system.
 
@@ -162,11 +168,13 @@ The color selector provides a fixed high-contrast palette that works with both t
 - Blue
 - Magenta
 
-The selected color is persisted in the Windows Registry and restored on the next launch.
+Each color entry includes a visual swatch beside its name. The selected color is persisted in the Windows Registry and restored on the next launch.
 
 ### Live Font and Color Preview
 
-Changing either **Clock Font** or **Clock Color** immediately redraws the real clock, so the preview is shown at the clock's actual size and position rather than in a simulated sample box.
+Settings contains a fixed **11:11** preview panel above the font selector. It uses the same built-in digital renderer or selected Windows font and the same selected clock color.
+
+Changing either **Clock Font** or **Clock Color** also redraws the real clock immediately, so you can compare the compact Settings preview with the clock at its actual desktop size and position.
 
 - Press **OK** to save the selected font and color.
 - Press **Cancel**, close the Settings window, or press **Esc** to restore the font and color that were active before Settings was opened.
@@ -200,7 +208,7 @@ The active format is check-marked in the right-click menu and restored on the ne
 
 Settings and About are centered inside the usable work area of the monitor containing the clock.
 
-The saved clock rectangle is checked against the currently available monitor work areas when DAD Clock starts or Windows reports a display-layout change. If a previously used monitor has been disconnected, the clock is moved back into a visible work area.
+The saved clock rectangle is checked against the currently available monitor work areas when DAD Clock starts or Windows reports a display-layout change. If a previously used monitor has been disconnected, the clock is moved back into a visible work area. If the saved clock is larger than the target monitor work area, it is reduced proportionally before being repositioned.
 
 ## First run
 
@@ -274,7 +282,7 @@ and stays on classic Win32/GDI APIs rather than introducing a modern framework o
 
 The font/color preview and color selector use existing Win32 controls, GDI drawing, and registry APIs; no framework or runtime dependency is added.
 
-The CI pipeline verifies the PE subsystem and dependency contract. Formal behavioral certification on every historical Windows release still requires running the binary on those operating systems or representative VMs.
+The CI pipeline verifies the PE subsystem, security flags, version resource, DLL set, and the exact reviewed imported Win32 API-function surface. Any new imported API fails CI until it is deliberately reviewed and added to the allowlist. Formal behavioral certification on every historical Windows release still requires running the binary on those operating systems or representative VMs.
 
 ## Technology
 
@@ -285,7 +293,8 @@ The CI pipeline verifies the PE subsystem and dependency contract. Formal behavi
 | Rendering | GDI |
 | Transparency | Win32 layered-window color key |
 | System font discovery | GDI font-family enumeration |
-| Font/color preview | Live redraw of the clock window |
+| Font/color preview | In-Settings 11:11 preview + live redraw of the clock window |
+| Version metadata | Native Windows VERSIONINFO resource |
 | Architecture | x86 / 32-bit |
 | Target subsystem | Windows GUI 5.01 |
 | UI framework | None |
@@ -322,8 +331,10 @@ The build script:
 5. links for `WINDOWS,5.01`,
 6. uses `/NODEFAULTLIB`,
 7. uses the custom `EntryPoint`,
-8. removes temporary object/resource files,
-9. leaves the portable `DADClock.exe`.
+8. enables deterministic linker output with `/Brepro`,
+9. explicitly keeps `/DYNAMICBASE` and `/NXCOMPAT`,
+10. removes temporary object/resource files,
+11. leaves the portable `DADClock.exe`.
 
 The application icon is generated by the repository artwork script in CI. Pillow is a developer/CI dependency only; it is never needed to run DAD Clock.
 
@@ -348,23 +359,28 @@ python make_icon.py
 
 The repository contains a Windows GitHub Actions workflow that runs on **Windows Server 2022** and uses the Microsoft x86 C++ toolchain.
 
+The build/test job runs with **read-only repository contents permission**. A separate `main`-only synchronization job receives `contents: write` solely to update generated release files. GitHub Actions are pinned to full commit SHAs, and Pillow/pefile are pinned to exact versions for a more reproducible supply chain.
+
 The pipeline:
 
 1. regenerates the DAD Clock application assets,
 2. builds `DADClock.exe`,
-3. validates the resulting PE,
+3. validates the resulting PE and reviewed imported API surface,
 4. calculates SHA-256,
 5. uploads the `DADClock-Windows-x86` portable build artifact,
-6. on successful pushes to `main`, synchronizes generated PNG/ICO/EXE files back to the repository.
+6. on successful pushes to `main`, independently rebuilds and re-verifies before synchronizing generated PNG/ICO/EXE files back to the repository.
 
 `tools/verify_pe.py` checks that the executable is:
 
 - **PE32 / x86** (`0x014C`)
 - Windows GUI subsystem
 - subsystem version **5.01**
+- carrying `DYNAMIC_BASE` and `NX_COMPAT`
 - free of MSVC/UCRT runtime DLL dependencies
-- limited to the expected Windows system imports
-- carrying an embedded icon resource
+- limited to the expected Windows system DLLs
+- limited to the exact reviewed imported Win32 API-function allowlist
+- carrying embedded icon resources
+- carrying native **VERSIONINFO** with file version `1.0.0.0`
 - below the project's 1 MB sanity limit
 
 ## Project structure
