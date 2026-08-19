@@ -25,10 +25,10 @@ if errorlevel 1 exit /b 1
 cl /nologo /c /O1 /Os /Oi- /GS- /GR- /EHs-c- /Zl /W4 /D_WIN32_WINNT=0x0501 /DWINVER=0x0501 /Fo"%ROOT%clock.obj" "%ROOT%clock.cpp"
 if errorlevel 1 exit /b 1
 
-rc /nologo /fo "%ROOT%clock.res" "%ROOT%BABAClock.rc"
+rc /nologo /fo "%ROOT%clock.res" "%ROOT%DADClock.rc"
 if errorlevel 1 exit /b 1
 
-link /nologo /MANIFEST:NO /SUBSYSTEM:WINDOWS,5.01 /ENTRY:EntryPoint /NODEFAULTLIB /OPT:REF /OPT:ICF /INCREMENTAL:NO /OUT:"%ROOT%BABAClock.exe" "%ROOT%clock.obj" "%ROOT%clock.res" kernel32.lib user32.lib gdi32.lib advapi32.lib shell32.lib
+link /nologo /MANIFEST:NO /SUBSYSTEM:WINDOWS,5.01 /ENTRY:EntryPoint /NODEFAULTLIB /OPT:REF /OPT:ICF /INCREMENTAL:NO /OUT:"%ROOT%DADClock.exe" "%ROOT%clock.obj" "%ROOT%clock.res" kernel32.lib user32.lib gdi32.lib advapi32.lib shell32.lib
 set "RESULT=%ERRORLEVEL%"
 del /q "%ROOT%clock.obj" 2>nul
 del /q "%ROOT%clock.res" 2>nul
