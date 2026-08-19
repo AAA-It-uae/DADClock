@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Mohammad Taghi Alavi
 
-"""Validate that BABAClock.exe matches the project's portability contract."""
+"""Validate that DADClock.exe matches the project's portability contract."""
 
 from pathlib import Path
 import sys
@@ -22,7 +22,7 @@ def fail(message: str) -> None:
 
 
 def main() -> None:
-    path = Path(sys.argv[1] if len(sys.argv) > 1 else "BABAClock.exe")
+    path = Path(sys.argv[1] if len(sys.argv) > 1 else "DADClock.exe")
     if not path.is_file():
         fail(f"missing {path}")
 
