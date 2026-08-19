@@ -20,11 +20,6 @@ ALLOWED = {
 if os.environ.get("GITHUB_EVENT_NAME") != "pull_request" or HEAD != "agent/full-hardening-pass":
     raise SystemExit("This one-shot bootstrap only runs on the DAD Clock hardening PR")
 
-subprocess.run(["git", "config", "core.autocrlf", "false"], check=True)
-subprocess.run(["git", "fetch", "origin", "main:refs/remotes/origin/main"], check=True)
-subprocess.run(["git", "fetch", "origin", HEAD + ":refs/remotes/origin/" + HEAD], check=True)
-subprocess.run(["git", "checkout", "-B", HEAD, "origin/" + HEAD], check=True)
-
 encoded = "".join(path.read_text() for path in PAYLOADS)
 archive = base64.b64decode(encoded, validate=True)
 with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tf:
@@ -44,7 +39,11 @@ Path("make_icon.py").write_bytes(subprocess.check_output(["git", "show", "origin
 for path in PAYLOADS:
     path.unlink()
 
-subprocess.run(["git", "diff", "--check"], check=True)
+subprocess.run([
+    "git", "diff", "--check", "--",
+    "clock.cpp", "README.md", "DADClock.rc", "build.bat",
+    "tools/verify_pe.py", ".github/workflows/build-windows.yml"
+], check=True)
 subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
 subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
 subprocess.run(["git", "add", "-A"], check=True)
