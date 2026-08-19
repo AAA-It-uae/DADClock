@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: dadclock-hardening-bootstrap-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   bootstrap:
     if: github.event_name == 'pull_request'
