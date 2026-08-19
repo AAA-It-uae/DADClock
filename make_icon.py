@@ -16,6 +16,7 @@ ALLOWED = {
     "tools/verify_pe.py",
     ".github/workflows/build-windows.yml",
 }
+WORKFLOW = ".github/workflows/build-windows.yml"
 
 if os.environ.get("GITHUB_EVENT_NAME") != "pull_request" or HEAD != "agent/full-hardening-pass":
     raise SystemExit("This one-shot bootstrap only runs on the DAD Clock hardening PR")
@@ -28,6 +29,8 @@ with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tf:
     if names != ALLOWED or any(not member.isfile() for member in members):
         raise SystemExit("Hardening payload contains unexpected files")
     for member in members:
+        if member.name == WORKFLOW:
+            continue
         target = Path(member.name)
         target.parent.mkdir(parents=True, exist_ok=True)
         source = tf.extractfile(member)
@@ -41,12 +44,10 @@ for path in PAYLOADS:
 
 subprocess.run([
     "git", "diff", "--check", "--",
-    "clock.cpp", "README.md", "DADClock.rc", "build.bat",
-    "tools/verify_pe.py", ".github/workflows/build-windows.yml"
+    "clock.cpp", "README.md", "DADClock.rc", "build.bat", "tools/verify_pe.py"
 ], check=True)
 subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
 subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
 subprocess.run(["git", "add", "-A"], check=True)
-subprocess.run(["git", "commit", "-m", "Harden DAD Clock release and settings"], check=True)
+subprocess.run(["git", "commit", "-m", "Harden DAD Clock runtime and release metadata"], check=True)
 subprocess.run(["git", "push", "origin", "HEAD:" + HEAD], check=True)
-subprocess.run(["python", "make_icon.py"], check=True)
